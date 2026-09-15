@@ -1,0 +1,9 @@
+[package]
+name = "mtc_tree"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mtc_core = { path = "../mtc_core" }
+mtc_crypto = { path = "../mtc_crypto" }
+thiserror = "2.0" 

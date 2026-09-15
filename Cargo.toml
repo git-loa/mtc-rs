@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = [
+    "mtc_core",
+    "mtc_crypto",
+    "mtc_tree",
+    "mtc_ca",
+    "mtc_client",
+    "mtc_cli",
+]
