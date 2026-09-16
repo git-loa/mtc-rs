@@ -3,7 +3,7 @@
 //! - Leaves are prefixed with 0x00
 //! - Internal nodes are prefixed with 0x01
 
-use blake3::hash;
+use blake3;
 
 
 use crate::error::CryptoError;
@@ -25,7 +25,7 @@ impl HashFn for Blake3Hash{
         buffer.push(0x00); // Domain separation prefix for leaves
         buffer.extend_from_slice(data);
 
-        Ok(hash(&buffer).into()) // Returns a 32-byte hash [u8; 32].
+        Ok(blake3::hash(&buffer).into()) // Returns a 32-byte hash [u8; 32].
     }
 
     fn hash_node(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32], CryptoError> {
@@ -40,7 +40,7 @@ impl HashFn for Blake3Hash{
         buffer.extend_from_slice(left);
         buffer.extend_from_slice(right);
 
-        Ok(hash(&buffer).into()) // Returns a 32-byte hash [u8; 32].
+        Ok(blake3::hash(&buffer).into()) // Returns a 32-byte hash [u8; 32].
     }
 }
 
