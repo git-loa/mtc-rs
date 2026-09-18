@@ -1,174 +1,463 @@
 # Merkle Tree Certificates (MTC) — Rust
 
-A modular Rust implementation of **Merkle Tree Certificates (MTCs)**, focused on cryptographic verification, Merkle trees, certificate transparency, and interoperability with Python and TLS tooling.
+A modular Rust implementation of the cryptographic and Merkle-tree foundations of **Merkle Tree Certificates (MTCs)**.
+
+The project follows the Merkle-tree and certificate-authentication architecture described in the MTC paper, with the current implementation focused on the foundational components required for MTCs: certificate data structures, cryptographic hashing, domain separation, Merkle-tree construction, and inclusion-proof generation and verification.
+
+The implementation is being developed incrementally toward the broader MTC architecture, including certificate issuance, TreeHeads and checkpoints, consistency proofs, cosigners, landmark certificates, client-side verification, and TLS/PQC integration.
+
+---
 
 ## Overview
 
-This project is a hands-on implementation of Merkle Tree Certificates.
+Merkle Tree Certificates use authenticated Merkle-tree structures to provide compact proofs that certificate information is included in an authenticated certificate log.
 
-The goal is to build an end-to-end system that can:
+At the core of the system is a binary Merkle tree:
 
-* represent certificates
-* hash certificate data
-* build Merkle trees
-* generate and verify inclusion proofs
-* create and verify TreeHeads
-* support certificate authority / log workflows
-* test interoperability with Python
-* explore integration with TLS 1.3 certificate analysis
+```text
+                    Root / TreeHead
+                         │
+                ┌────────┴────────┐
+                │                 │
+              Hash              Hash
+             /    \            /    \
+           ...    ...         ...    ...
+          / \     / \        / \     / \
+        Leaf     Leaf      Leaf     Leaf
+```
 
-The project is also a way for me to develop practical **Rust systems-programming and cryptographic engineering** skills.
+A certificate entry is converted into a leaf hash. Internal nodes are computed from their child hashes using domain-separated hashing. An inclusion proof then allows a verifier to reconstruct the root without receiving the entire tree.
+
+The current repository implements this lower-level Merkle-tree machinery and provides the foundation for the higher-level MTC components.
+
+---
+
+## Relationship to the MTC Architecture
+
+The full MTC architecture contains several components that build on the Merkle-tree foundation:
+
+```text
+                    Full MTC Architecture
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ MTCA / Certificate  │
+                  │      Issuance        │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Certificate Entries │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+        ┌─────────────────────────────────────────┐
+        │       CURRENT IMPLEMENTATION            │
+        │                                         │
+        │  ┌───────────────────────────────────┐  │
+        │  │ mtc-core                          │  │
+        │  │ Certificate + TreeHead structures │  │
+        │  └────────────────┬──────────────────┘  │
+        │                   │                     │
+        │  ┌────────────────▼──────────────────┐  │
+        │  │ mtc-crypto                        │  │
+        │  │ Hashing + domain separation       │  │
+        │  └────────────────┬──────────────────┘  │
+        │                   │                     │
+        │  ┌────────────────▼──────────────────┐  │
+        │  │ mtc-tree                          │  │
+        │  │ Merkle trees + inclusion proofs   │  │
+        │  └───────────────────────────────────┘  │
+        │                                         │
+        └───────────────────┬─────────────────────┘
+                            │
+                            ▼
+                  ┌─────────────────────┐
+                  │ Signed TreeHeads /  │
+                  │    Checkpoints      │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Consistency Proofs  │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │     Cosigners       │
+                  └──────────┬──────────┘
+                             │
+                    ┌────────┴────────┐
+                    ▼                 ▼
+             Standalone MTC      Landmark MTC
+              Certificates       Certificates
+                    │                 │
+                    └────────┬────────┘
+                             ▼
+                  ┌─────────────────────┐
+                  │    MTC Client       │
+                  │     Verification    │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │     TLS / PQC       │
+                  └─────────────────────┘
+```
+
+**The current project occupies the Merkle-tree and cryptographic foundation of this architecture.**
+
+Higher-level components will be added incrementally.
+
+---
 
 ## Project Structure
 
-The project is organized as a Rust workspace.
+```text
+mtc-rs/
+│
+├── mtc-core/
+│   └── Core MTC data structures
+│
+├── mtc-crypto/
+│   └── Cryptographic hashing and domain separation
+│
+├── mtc-tree/
+│   └── Merkle-tree construction and inclusion proofs
+│
+├── mtc-ca/
+│   └── MTC Certificate Authority
+│
+├── mtc-client/
+│   └── Client-side MTC verification
+│
+└── mtc-cli/
+    └── Command-line interface
+```
 
-### `mtc-core` — Core Types
+### `mtc-core`
 
-**Status: Complete**
+Provides the core data structures used by the MTC system.
 
-Defines the main data structures:
+Current components include:
 
 * `TreeHead`
 * `SignedTreeHead`
 * `MtcCertificate`
+* Certificate-related structures
 
-### `mtc-crypto` — Cryptographic Layer
+The crate provides the data model on which the higher-level MTC components will build.
 
-**Status: Complete**
+### `mtc-crypto`
 
-Provides:
+Provides the cryptographic primitives used by the Merkle-tree implementation.
 
-* `HashFn` trait
-* BLAKE3 hashing
-* domain separation
-* input validation
-* structured cryptographic errors
+Current components include:
 
-### `mtc-tree` — Merkle Tree
+* Hash function abstraction
+* Leaf hashing
+* Internal-node hashing
+* Domain separation
+* Deterministic hashing
+* Input validation
+* Cryptographic error handling
 
-**Status: In Progress**
+The hashing layer is intentionally separated from the tree implementation so that cryptographic operations can be tested and evolved independently.
 
-Currently implements:
+### `mtc-tree`
 
-* Merkle tree construction
-* leaf hashing
-* internal-node hashing
-* inclusion-proof generation
-* inclusion-proof verification
-* error handling
+Implements the Merkle-tree layer.
 
-Next:
+Current development includes:
 
-* TreeHead integration
-* additional testing
-* documentation
+* Merkle-tree construction
+* Leaf hashing
+* Internal-node hashing
+* Inclusion-proof generation
+* Inclusion-proof verification
+* Deterministic tree construction
+* Tree-related error handling
 
-### `mtc-ca` — Certificate Authority / Log
+This crate represents the central Merkle-tree component of the current implementation.
 
-**Status: Planned**
+### `mtc-ca`
 
-Will handle:
+Planned higher-level component for MTC certificate issuance.
 
-* certificate batching
-* Merkle tree construction
-* TreeHead creation
-* TreeHead signing
-* proof bundles
+Planned functionality includes:
 
-### `mtc-client` — Client Verification
+* Certificate batching
+* Certificate-log management
+* Merkle-tree generation
+* TreeHeads
+* Signed TreeHeads
+* Certificate/proof bundles
 
-**Status: Planned**
+### `mtc-client`
 
-Will verify:
+Planned client-side verification layer.
 
-* certificate data
-* Merkle inclusion proofs
-* signed TreeHeads
-* consistency rules
-* timestamps
+Planned functionality includes:
 
-### `mtc-cli` — Command Line Interface
+* Certificate parsing
+* Leaf verification
+* Inclusion-proof verification
+* TreeHead verification
+* Consistency verification
+* Timestamp and validity checks
 
-**Status: Planned**
+### `mtc-cli`
 
-A CLI for creating, inspecting, and verifying MTC objects and proofs.
+Planned command-line interface for interacting with the MTC implementation.
 
-## Testing
+---
 
-Testing focuses on both individual examples and general properties.
+## Merkle Tree Model
 
-Properties being tested include:
+The Merkle-tree construction follows the authenticated binary Merkle-tree model used by Certificate Transparency.
 
-* valid proofs should verify
-* changing a leaf should invalidate its proof
-* changing a proof should cause verification to fail
-* changing the root should cause verification to fail
-* the same input should produce the same result
-* serialization and deserialization should preserve the object
+Leaf and internal-node hashing use domain separation:
 
-These properties are closely related to the idea of **invariants** in mathematics: define what must remain true, then test those properties across many inputs.
+```text
+LeafHash(x) = H(0x00 || x)
 
-Property-based testing will be expanded as the implementation develops.
+NodeHash(L, R) = H(0x01 || L || R)
+```
 
-## Python Interoperability
+The different prefixes distinguish leaf data from internal-node data.
 
-The project will include Python-based testing to verify interoperability with the Rust implementation.
+For a tree containing `N` leaves, the tree is recursively divided using the largest power-of-two subtree that is smaller than `N`.
 
-Planned tests include:
+For example, a nine-leaf tree is divided as:
 
-* Rust → Python proof verification
-* Python → Rust test vectors
-* cross-language serialization
-* deterministic hashing
-* cross-language Merkle tree construction
+```text
+                 Root
+              /       \
+          8 leaves    1 leaf
+         /   ...  \      \
+       L0          L7     L8
+```
 
-This will help verify that the implementation behaves consistently across languages.
+This allows non-power-of-two trees to be constructed without padding the tree or duplicating leaves.
 
-## TLS 1.3
+---
 
-MTC does **not replace TLS 1.3 or modify the TLS handshake**.
+## Inclusion Proofs
 
-The planned integration is focused on certificate analysis.
+An inclusion proof demonstrates that a particular leaf belongs to a Merkle tree without requiring the verifier to receive the complete tree.
 
-The system will be tested alongside TLS connections to:
+For a leaf at index `i`, the verifier uses the sibling hash at each level:
 
-1. obtain certificate chains
-2. extract certificate information
-3. process certificates through the MTC system
-4. generate or verify transparency proofs
+```text
+                    Root
+                     ▲
+                     │
+                 sibling
+                     ▲
+                     │
+                 sibling
+                     ▲
+                     │
+                 sibling
+                     ▲
+                     │
+                   Leaf
+```
 
-Python's `ssl` module and Rust's `rustls` ecosystem will be used for experimentation.
+The proof therefore requires approximately `O(log N)` sibling hashes.
 
-This may later be integrated with TLS certificate inventory and analysis tooling.
+During verification, the ordering of the hashes is determined by the position of the current node:
+
+```text
+if index is even:
+
+    parent = H(0x01 || current || sibling)
+
+if index is odd:
+
+    parent = H(0x01 || sibling || current)
+```
+
+The process continues upward until the calculated root is obtained.
+
+The proof is valid when the calculated root matches the expected authenticated tree root.
+
+---
+
+## Cryptographic Properties
+
+Testing focuses on both concrete examples and general properties of the implementation.
+
+Important properties include:
+
+* A valid inclusion proof verifies against the correct root.
+* Changing a leaf invalidates the corresponding proof.
+* Changing a proof causes verification to fail.
+* Changing the expected root causes verification to fail.
+* Deterministic operations produce consistent results.
+* Serialization and deserialization preserve the logical object.
+
+These properties connect naturally to the mathematical notion of invariants: rather than checking only individual examples, the implementation tests whether important relationships remain true under different inputs and transformations.
+
+Property-oriented and fuzz testing will be expanded as the implementation develops.
+
+---
 
 ## Development Status
 
-Current focus:
+| Component                    | Status                                    |
+| ---------------------------- | ----------------------------------------- |
+| `mtc-core`                   | 🟡 In progress                            |
+| `mtc-crypto`                 | 🟢 Implemented                            |
+| `mtc-tree`                   | 🟡 In progress                            |
+| Merkle-tree construction     | 🟡 In progress                            |
+| Inclusion-proof generation   | 🟡 In progress                            |
+| Inclusion-proof verification | 🟡 In progress                            |
+| TreeHead                     | 🟡 In progress                            |
+| SignedTreeHead structure     | 🟡 Structure implemented; signing planned |
+| `mtc-ca`                     | 🔵 Planned                                |
+| Consistency proofs           | 🔵 Planned                                |
+| Cosigner support             | 🔵 Planned                                |
+| Standalone MTC certificates  | 🔵 Planned                                |
+| Landmark certificates        | 🔵 Planned                                |
+| `mtc-client`                 | 🔵 Planned                                |
+| TLS integration              | 🔵 Planned                                |
+| PQC signature integration    | 🔵 Planned                                |
+| Python interoperability      | 🔵 Planned                                |
 
-* [x] Core data structures
-* [x] Cryptographic hashing layer
-* [x] Merkle tree construction
-* [x] Inclusion proof generation
-* [x] Inclusion proof verification
-* [ ] TreeHead integration
-* [ ] Expanded property-based testing
-* [ ] CA / log implementation
-* [ ] Client implementation
-* [ ] Python interoperability
-* [ ] TLS certificate integration
-* [ ] End-to-end demonstration
+**Legend**
 
-## Goals
+* 🟢 Implemented
+* 🟡 In progress
+* 🔵 Planned
 
-This project combines my interests in:
+---
 
-* cryptographic engineering
-* post-quantum security
-* certificate infrastructure
-* Rust systems programming
-* TLS security
-* mathematical invariants and computational verification
+## Python Interoperability
 
-The goal is to build a practical, testable cryptographic system while developing deeper experience with Rust and security engineering.
+A future goal is interoperability between the Rust implementation and Python-based tooling.
 
+Potential applications include:
+
+* Python-based certificate processing
+* Test-vector generation
+* Cross-language verification
+* Integration with existing TLS and security analysis tools
+
+The Rust implementation provides the cryptographic and systems-oriented foundation, while Python can be used for higher-level tooling and experimentation.
+
+---
+
+## TLS 1.3 Integration
+
+MTC is intended to operate **alongside TLS rather than replace TLS**.
+
+A future integration will investigate:
+
+```text
+TLS 1.3
+   │
+   ├── Certificate
+   │
+   ├── MTC proof
+   │
+   └── PQC authentication
+```
+
+The goal is to connect certificate transparency-style verification with modern TLS and post-quantum cryptographic workflows.
+
+---
+
+## Post-Quantum Cryptography
+
+The project is being developed in the context of the transition to post-quantum cryptography.
+
+Areas of interest include:
+
+* Post-quantum certificate management
+* Cryptographic agility
+* Large PQC certificate and signature overhead
+* MTC-based certificate authentication
+* TLS 1.3
+* NIST-standardized post-quantum algorithms
+
+PQC signature integration is a future layer of the project. The Merkle-tree itself should not be interpreted as a post-quantum cryptographic algorithm; rather, MTC provides certificate-authentication infrastructure that can be used in PQC-era systems.
+
+---
+
+## Development Roadmap
+
+The implementation is planned to progress from the cryptographic foundation toward the complete MTC architecture.
+
+### Phase 1 — Merkle Foundation
+
+* Complete `mtc-tree`
+* Complete inclusion-proof generation
+* Complete inclusion-proof verification
+* Expand unit and property-oriented tests
+* Document tree and proof algorithms
+
+### Phase 2 — MTC Data Model
+
+* Complete `TreeHead`
+* Complete `SignedTreeHead`
+* Define MTC proof structures
+* Add serialization and deserialization
+* Add test vectors
+
+### Phase 3 — MTC Certificate Authority
+
+* Implement `mtc-ca`
+* Certificate-entry generation
+* Certificate-log management
+* TreeHead/checkpoint generation
+* Certificate/proof bundles
+
+### Phase 4 — Verification
+
+* Implement `mtc-client`
+* Inclusion-proof verification
+* TreeHead verification
+* Consistency-proof verification
+* Certificate validity and timestamp checks
+
+### Phase 5 — Distributed Trust
+
+* Implement cosigner support
+* Checkpoint signatures
+* Cosigner quorum verification
+* Standalone MTC certificates
+* Landmark certificates
+
+### Phase 6 — TLS and PQC
+
+* TLS certificate extraction
+* MTC verification alongside TLS
+* Python/Rust interoperability
+* PQC authentication experiments
+* Integration with post-quantum TLS workflows
+
+---
+
+## Project Goals
+
+The project has four primary goals:
+
+1. **Understand MTC architecture** by implementing its cryptographic foundations from the bottom up.
+2. **Develop practical Rust systems-programming skills** through a modular cryptographic software project.
+3. **Build verifiable cryptographic software** with explicit invariants, deterministic behavior, and systematic testing.
+4. **Progress toward an end-to-end MTC implementation** capable of interacting with certificate and TLS/PQC infrastructure.
+
+---
+
+## References
+
+* *Merkle Tree Certificates* — research paper motivating this implementation.
+* RFC 9162 — Certificate Transparency Version 2.0.
+* NIST Post-Quantum Cryptography standards, including ML-KEM and ML-DSA.
+
+---
+
+## License
+
+This project is currently under development. See the repository license for details.
