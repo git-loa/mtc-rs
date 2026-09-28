@@ -1,7 +1,4 @@
-//! Cryptographic primitives for the MTC system.
-//!
-//! This crate defines the implementation of the hashing abstraction ('HashFn') and
-//! concrete implemetation such as `Blake3Hash`. 
+//! Cryptographic abstractions and implementations for MTC. 
 
 pub mod error;
 pub mod hash;

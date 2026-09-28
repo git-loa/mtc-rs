@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 blake3 = "1.8"
 thiserror = "2.0"
+mtc_core = { path = "../mtc_core" }

@@ -1,21 +1,25 @@
 //! Abstraction for hash functions used in Merkle trees.
-//! This trait defines the interface for hashing leaf nodes 
-//! and internal nodes in a Merkle tree.
 //!
-//! Implementations must provide:
-//! - `hash_leaf`: A method to hash leaf data, returning a 32-byte hash.
-//! - `hash_node`: A method to hash two child node hashes, returning a 32
+//! This module defines the interface that concrete hash
+//! implementations must provide.
 
 use crate::error::CryptoError;
+use mtc_core::types::{HashValue, HashAlgorithm};
 
+/// Abstraction over cryptographic hash functions.
+///
+/// Implementations provide hashing operations for:
+/// - leaf data
+/// - internal Merkle tree nodes
 pub trait HashFn{
-    /// Hashes the given leaf data (certificate body) and returns a 32-byte hash.
-    /// Returns an error if the input data is empty.
-    fn hash_leaf(data: &[u8]) -> Result<[u8; 32], CryptoError>;
+    /// Returns the algorithm implemented by this hash function.
+    fn algorithm(&self) -> HashAlgorithm;
 
-    /// Hashes the given left and right child node hashes and returns a 32-byte hash.
-    /// Returns an error if the input node hashes are not exactly 32 bytes each.
-    fn hash_node(left: &[u8; 32], right: &[u8; 32]) -> Result<[u8; 32], CryptoError>;
+    /// Hashes leaf data.
+    fn hash_leaf(&self, data: &[u8]) -> Result<HashValue, CryptoError>;
+
+    /// Hashes two child nodes to produce a parent node.
+    fn hash_two_children(&self, left: &HashValue, right: &HashValue) -> Result<HashValue, CryptoError>;
 }
 
 

@@ -10,6 +10,7 @@ pub enum HashAlgorithm {
     Sha256,
     Sha384,
     Sha512,
+    Blake3,
 }
 
 /// A cryptographic hash value together with the algorithm
@@ -19,8 +20,6 @@ pub struct HashValue {
     algorithm: HashAlgorithm,
     bytes: Vec<u8>,
 }
-
-
 
 impl HashValue{ 
     pub fn new(
@@ -34,8 +33,8 @@ impl HashValue{
             HashAlgorithm::Sha256 => 32,
             HashAlgorithm::Sha384 => 48,
             HashAlgorithm::Sha512 => 64,
+            HashAlgorithm::Blake3 => 32,
         };
-
 
         // Failure
         if bytes.len() != expected_length {
@@ -46,15 +45,10 @@ impl HashValue{
             ));
         }
 
-        Ok(Self {
-            algorithm,
-            bytes,
-        })
+        Ok(Self { algorithm, bytes})
     }
 
-
     // ####### ENCAPSULATION ########
-
     // Returns the hash algorithm used to produce this value.
     pub fn algorithm(&self) -> HashAlgorithm {
         self.algorithm
@@ -104,22 +98,18 @@ pub enum SignatureAlgorithm {
 
 /// A cryptographic signature together with the algorithm
 /// that produced it.
-/// #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
     algorithm: SignatureAlgorithm,
     bytes: Vec<u8>,
 }
-
 
 impl Signature {
     pub fn new(
         algorithm: SignatureAlgorithm,
         bytes: Vec<u8>,
     ) -> Self {
-        Self {
-        algorithm,
-        bytes,
-        }
+        Self { algorithm, bytes, }
     }
 
 
@@ -135,37 +125,69 @@ impl Signature {
 }
 
 
+/// A TreeHead together with a cryptographic signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedTreeHead {
+    tree_head: TreeHead,
+    signature: Signature,
+}
 
-/// A signed version of a `TreeHead`.
-///
-/// This structure contains:
-/// - the original `TreeHead`
-/// - a digital signature produced by the CA
-///
-/// The signature is typically generated using a post-quantum
-/// signature scheme (e.g., ML-DSA or ML-KEM hybrid).
-#[derive(Debug, Clone)]
-pub struct SignedTreehead {
-    pub treehead: TreeHead,
-    pub signature: Vec<u8>,
+
+impl SignedTreeHead {
+    pub fn new (
+        tree_head: TreeHead,
+        signature: Signature,
+    ) -> Self {
+        Self { tree_head, signature, }
+    }
+
+    // Accessors
+    pub  fn tree_head(&self) -> &TreeHead {
+        &self.tree_head
+    }
+
+    pub fn signature(&self) -> &Signature {
+        &self.signature
+    }
 }
 
 
 
-/// A complete MTC certificate.
-///
-/// Contains:
-/// - the raw certificate body (`body`)
-/// - the Merkle inclusion proof (`proof`)
-/// - the signed tree head (`signed_tree_head`)
-///
-/// This is the object clients receive and verify.
-#[derive(Debug, Clone)]
+
+
+
+/// An MTC certificate containing certificate data,
+/// a Merkle inclusion proof, and the authenticated tree state.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MtcCertificate {
-    pub body: Vec<u8>,
-    pub proof: Vec<[u8; 32]>,
-    pub signed_treehead: SignedTreehead,
+    body: Vec<u8>,
+    proof: Vec<HashValue>,
+    signed_tree_head: SignedTreeHead,
 }
+
+impl MtcCertificate {
+    pub fn new (
+        body: Vec<u8>,
+        proof: Vec<HashValue>,
+        signed_tree_head: SignedTreeHead, 
+    ) -> Self {
+        Self { body, proof, signed_tree_head }
+    }
+
+    // Accessors
+    pub fn body(&self) -> &[u8] {
+        &self.body
+    }
+
+    pub fn proof(&self) -> &[HashValue] {
+        &self.proof
+    }
+
+    pub fn signed_tree_head(&self) -> &SignedTreeHead {
+        &self.signed_tree_head
+    }
+}
+
 
 
 //###############################
@@ -285,93 +307,87 @@ mod tests {
         assert_eq!(signature.bytes(), bytes.as_slice());
     }
 
-//     // Test to ensure that the Treehead struct fields 
-//     // are correctly assigned and accessible.
+    #[test]
+    fn signed_tree_head_exposes_tree_head_and_signature() {
+        let hash = HashValue::new(
+            HashAlgorithm::Sha256, 
+            vec![0u8; 32]
+        ).unwrap();
 
-//     #[test]
-//     fn test_treehead_fields_are_correct() {
-//         let root = [0u8; 32];
-//         let size = 100;
-//         let timestamp = 123456;
+        let tree_head = TreeHead {
+            root: hash,
+            size: 100,
+            timestamp: 1_757_000_000,
+        };
+        let signature = Signature::new(SignatureAlgorithm::MlDsa, vec![0u8, 100]);
 
-//         let th = TreeHead {
-//             root,
-//             size,
-//             timestamp,
-//         };
+        let signed_tree_head = SignedTreeHead::new(
+            tree_head.clone(),
+            signature.clone(),
+        );
 
-//         assert_eq!(th.root, root);
-//         assert_eq!(th.size, size);
-//         assert_eq!(th.timestamp, timestamp);
-//     }
+        assert_eq!(signed_tree_head.tree_head(), &tree_head);
+        assert_eq!(signed_tree_head.signature(), &signature);
+    }
 
 
-//     // Test to ensure that the SignedTreehead struct fields
-//     // are correctly assigned and accessible.
-//     // This test checks that the treehead and signature are correctly stored
-//     // and can be retrieved.
-//     #[test]
-//     fn test_signed_treehead_clones_correctly() {
-//         let root = [2u8; 32];
-//         let size = 100;
-//         let timestamp = 123456;
-//         let signature = vec![0xAA, 0xBB];
 
-//         let treehead = TreeHead {
-//             root,
-//             size,
-//             timestamp,
-//         };
 
-//         let signed_treehead = SignedTreehead {
-//             treehead: treehead.clone(),
-//             signature: signature.clone(),
-//         };
+    //####### MtcCertificate ##########
+    #[test]
+    fn mtc_certificate_exposes_body_proof_and_signed_tree_head() {
+        let body = vec![1u8, 2u8, 3u8];
 
-//         let cloned_signed_treehead = signed_treehead.clone();
+        let proof_hash = HashValue::new(
+            HashAlgorithm::Sha256,
+            vec![0u8; 32],
+        )
+        .unwrap();
 
-//         assert_eq!(cloned_signed_treehead.treehead.root, root);
-//         assert_eq!(cloned_signed_treehead.treehead.size, size);
-//         assert_eq!(cloned_signed_treehead.treehead.timestamp, timestamp);
-//         assert_eq!(cloned_signed_treehead.signature, signature);
-//     }
+        let proof = vec![proof_hash.clone()];
 
-//     // Test to ensure that the MtcCertificate struct fields
-//     // are correctly assigned and accessible.
-//     // This test checks that the certificate, proof, and signed treehead
-//     // are correctly stored and can be retrieved.
-//     #[test]
-//     fn test_mtc_certificate_holds_data() {
-//         let body = vec![0x01, 0x02, 0x03];
-//         let proof = vec![[0u8; 32], [1u8; 32]];
-//         let root = [3u8; 32];
-//         let size = 200;
-//         let timestamp = 654321;
-//         let signature = vec![0xCC, 0xDD];
+        let hash = HashValue::new(
+            HashAlgorithm::Sha256,
+            vec![0u8; 32],
+        )
+        .unwrap();
 
-//         let treehead = Treehead {
-//             root,
-//             size,
-//             timestamp,
-//         };
+        let tree_head = TreeHead {
+            root: hash,
+            size: 100,
+            timestamp: 1_757_000_000,
+        };
 
-//         let signed_treehead = SignedTreehead {
-//             treehead: treehead.clone(),
-//             signature: signature.clone(),
-//         };
+        let signature = Signature::new(
+            SignatureAlgorithm::MlDsa,
+            vec![0u8; 100],
+        );
 
-//         let mtc_certificate = MtcCertificate {
-//             body: body.clone(),
-//             proof: proof.clone(),
-//             signed_treehead: signed_treehead.clone(),
-//         };
+        let signed_tree_head = SignedTreeHead::new(
+            tree_head,
+            signature,
+        );
 
-//         assert_eq!(mtc_certificate.body, body);
-//         assert_eq!(mtc_certificate.proof, proof);
-//         assert_eq!(mtc_certificate.proof.len(), proof.len());
-//         assert_eq!(mtc_certificate.signed_treehead.treehead.root, root);
-//         assert_eq!(mtc_certificate.signed_treehead.treehead.size, size);
-//         assert_eq!(mtc_certificate.signed_treehead.treehead.timestamp, timestamp);
-//         assert_eq!(mtc_certificate.signed_treehead.signature, signature);
-//     }
+        let certificate = MtcCertificate::new(
+            body.clone(),
+            proof.clone(),
+            signed_tree_head.clone(),
+        );
+
+        assert_eq!(
+            certificate.body(),
+            body.as_slice()
+        );
+
+        assert_eq!(
+            certificate.proof(),
+            proof.as_slice()
+        );
+
+        assert_eq!(
+            certificate.signed_tree_head(),
+            &signed_tree_head
+        );
+    }
+
 }
