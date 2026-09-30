@@ -1,8 +1,8 @@
 //! BLAKE3 implementation of the `HashFn` trait.
-//! 
-//! Domain separation:
-//! - Leaves are prefixed with 0x00.
-//! - Internal nodes are prefixed with 0x01.
+//!
+//! Leaf and internal-node inputs use domain separation:
+//! - `0x00` for leaf data.
+//! - `0x01` for internal nodes.
 
 use blake3;
 
@@ -10,22 +10,28 @@ use crate::error::CryptoError;
 use crate::hash::HashFn;
 use mtc_core::types::{HashAlgorithm, HashValue};
 
-///BLAKE3 hash function with domain separation
-/// for leaves and internal nodes.
+///BLAKE3 hash function with domain separation for Merlke tree nodes.
+#[derive(Debug)]
 pub struct Blake3Hash;
 
-// Three interfaces: algorithm hash_leaf, hash_two_children
 impl HashFn for Blake3Hash {
-
+    /// Returns `Blake3` as the algorithm identifier.
     fn algorithm(&self) -> HashAlgorithm {
         HashAlgorithm::Blake3
     }
 
-    fn hash_leaf(&self, data: &[u8]) -> Result<HashValue, CryptoError> {
-        if data.is_empty() {
-            return  Err(CryptoError::EmptyLeafData);
-        }
+    /// Computes the hash representing an empty tree.
+    fn hash_empty(&self) -> Result<HashValue, CryptoError> {
+        let digest: [u8; 32] = blake3::hash(b"").into();
 
+        HashValue::new(
+            HashAlgorithm::Blake3,
+            digest.to_vec(),
+        ).map_err(|_| CryptoError::InvalidHashLength)
+    }
+
+    /// Computes a leaf hash using `0x00 || data`
+    fn hash_leaf(&self, data: &[u8]) -> Result<HashValue, CryptoError> {
         // Domain separation: 0x00 || data
         let mut buffer =Vec::with_capacity(1 + data.len());
         buffer.push(0x00);
@@ -33,21 +39,22 @@ impl HashFn for Blake3Hash {
 
         let digest: [u8; 32] = blake3::hash(&buffer).into();
 
-        // Throws and error if arguments are wrong.
         HashValue::new(
             HashAlgorithm::Blake3, 
             digest.to_vec()
         ).map_err(|_| CryptoError::InvalidHashLength)
     }
 
-
+    /// Computes an internal-node hash using `0x01 || left || right`.
+    ///
+    /// Both child hashes must use BLAKE3.
     fn hash_two_children(
         &self, 
         left: &HashValue, 
         right: &HashValue,
     ) -> Result<HashValue, CryptoError> {
         
-        // Check that left and right algorightms match.
+        // Ensure both child hashes use the configured algorithm.
         if left.algorithm() != self.algorithm() || right.algorithm() != self.algorithm()
         { 
             return Err(CryptoError::HashAlgorithmMismatch);
@@ -61,8 +68,6 @@ impl HashFn for Blake3Hash {
 
         let digest: [u8; 32] = blake3::hash(&buffer).into();
 
-
-        // Check for errors
         HashValue::new(
             HashAlgorithm::Blake3,
             digest.to_vec(),
@@ -107,13 +112,6 @@ mod tests {
     }
 
     #[test]
-    fn empty_leaf_data_returns_error(){
-        let hasher = Blake3Hash;
-        let result = hasher.hash_leaf(b"");
-        assert_eq!(result, Err(CryptoError::EmptyLeafData));
-    }
-
-    #[test]
     fn rejects_hash_with_wrong_algorithm() {
         let hasher = Blake3Hash;
 
@@ -140,5 +138,18 @@ mod tests {
         let node_hash = hasher.hash_two_children(&left, &right).unwrap();
 
         assert_ne!(leafhash, node_hash);
+    }
+
+    #[test]
+    fn empty_tree_hash_differs_from_empty_leaf() {
+        let hasher = Blake3Hash;
+
+        let empty_tree = hasher.hash_empty().unwrap();
+
+        let empty_leaf = hasher.hash_leaf(b"").unwrap();
+
+        assert_ne!(empty_tree, empty_leaf);
+        assert_eq!(empty_leaf.algorithm(), HashAlgorithm::Blake3);
+        assert_eq!(empty_tree.algorithm(), HashAlgorithm::Blake3);
     }
 }

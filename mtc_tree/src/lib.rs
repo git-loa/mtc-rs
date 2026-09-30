@@ -1,8 +1,8 @@
-//! Merkle tree construction and proof handling for MTC system.
+//! Merkle tree construction and proof handling for the MTC system.
 //!
-//! This module depends on:
-//! - `mtc-core` for shared types(e.g., certificate bodies, TreeHead)
-//! - `mtc-cryto` for cryptographic primitives.
+//! This crate depends on:
+//! - `mtc_core` for shared types such as `HashValue` and `TreeHead`.
+//! - `mtc_crypto` for cryptographic primitives.
 
 pub mod error;
 pub mod tree;
