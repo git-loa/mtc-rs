@@ -5,5 +5,5 @@
 //! - `mtc_crypto` for cryptographic primitives.
 
 pub mod error;
-pub mod tree;
 pub mod proof;
+pub mod tree;

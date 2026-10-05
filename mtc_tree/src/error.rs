@@ -1,7 +1,7 @@
 //! Error types for Merkle tree operations.
 
-use thiserror::Error;
 use mtc_crypto::error::CryptoError;
+use thiserror::Error;
 
 /// Errors that can occur during Merkle tree operations.
 #[derive(Debug, Error)]

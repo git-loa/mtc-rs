@@ -4,10 +4,7 @@
 //! Certificate Transparency and MTC.
 
 use crate::error::TreeError;
-use crate::tree::{
-    MerkleTree,
-    largest_power_of_two_less_than
-};
+use crate::tree::{MerkleTree, largest_power_of_two_less_than};
 use mtc_core::types::HashValue;
 use mtc_crypto::hash::HashFn;
 
@@ -55,7 +52,6 @@ fn generate_proof<H: HashFn>(
     leaves: &[HashValue],
     leaf_index: usize,
 ) -> Result<Vec<HashValue>, TreeError> {
-
     if leaves.len() == 1 {
         return Ok(Vec::new());
     }
@@ -75,9 +71,9 @@ fn generate_proof<H: HashFn>(
         return Ok(proof);
     }
 
-    // Right Subtree: recurse right 
+    // Right Subtree: recurse right
     let left = &leaves[..k];
-    let right =&leaves[k..];
+    let right = &leaves[k..];
 
     let mut proof = generate_proof(tree, right, leaf_index - k)?;
 
@@ -91,10 +87,7 @@ fn generate_proof<H: HashFn>(
 ///
 /// The returned directions are ordered from leaf to root so that
 /// `path[i]` corresponds to `proof[i]`.
-fn determine_proof_path(
-    leaf_index: usize,
-    tree_size: usize,
-) -> Result<Vec<Direction>, TreeError> {
+fn determine_proof_path(leaf_index: usize, tree_size: usize) -> Result<Vec<Direction>, TreeError> {
     if tree_size == 0 {
         return Err(TreeError::InvalidTreeSize);
     }
@@ -113,8 +106,7 @@ fn determine_proof_path(
         if current_index < k {
             path.push(Direction::Left);
             subtree_size = k;
-        }
-        else {
+        } else {
             path.push(Direction::Right);
             current_index -= k;
             subtree_size -= k;
@@ -125,13 +117,12 @@ fn determine_proof_path(
     Ok(path)
 }
 
-
 /// Verifies an inclusion proof for a leaf against an expected Merkle root.
 ///
 /// The proof and its corresponding directions are processed in leaf-to-root
 /// order. Returns `Ok(true)` when the reconstructed root matches
 /// `expected_root`, or `Ok(false)` when it does not.
-pub(crate) fn verify_inclusion_proof<H:HashFn> (
+pub(crate) fn verify_inclusion_proof<H: HashFn>(
     hasher: &H,
     leaf_data: &[u8],
     leaf_index: usize,
@@ -149,20 +140,12 @@ pub(crate) fn verify_inclusion_proof<H:HashFn> (
 
     for (direction, sibling) in path.iter().zip(proof.iter()) {
         current = match direction {
-            Direction::Left => {
-                hasher.hash_two_children(&current, sibling)?
-            }
-            Direction::Right => {
-                hasher.hash_two_children(sibling, &current)?
-            }
+            Direction::Left => hasher.hash_two_children(&current, sibling)?,
+            Direction::Right => hasher.hash_two_children(sibling, &current)?,
         };
     }
     Ok(current == *expected_root)
 }
-
-
-
-
 
 // ########################
 // ###### Testing #########
@@ -188,7 +171,7 @@ mod tests {
         tree.append(b"hello").unwrap();
         tree.append(b"world").unwrap();
 
-        let proof = generate_inclusion_proof(&tree,0).unwrap();
+        let proof = generate_inclusion_proof(&tree, 0).unwrap();
 
         assert_eq!(proof.len(), 1);
         assert_eq!(proof[0], tree.leaves()[1]);
@@ -200,7 +183,7 @@ mod tests {
         tree.append(b"hello").unwrap();
         tree.append(b"world").unwrap();
 
-        let proof = generate_inclusion_proof(&tree,1).unwrap();
+        let proof = generate_inclusion_proof(&tree, 1).unwrap();
 
         assert_eq!(proof.len(), 1);
         assert_eq!(proof[0], tree.leaves()[0]);
@@ -226,22 +209,16 @@ mod tests {
 
         let d0_hash = hasher.hash_leaf(b"d0").unwrap();
         let d1_hash = hasher.hash_leaf(b"d1").unwrap();
-        let d0_d1_root = hasher
-            .hash_two_children(&d0_hash, &d1_hash)
-            .unwrap();
+        let d0_d1_root = hasher.hash_two_children(&d0_hash, &d1_hash).unwrap();
 
         let d4_hash = hasher.hash_leaf(b"d4").unwrap();
         let d5_hash = hasher.hash_leaf(b"d5").unwrap();
-        let d4_d5_root = hasher
-            .hash_two_children(&d4_hash, &d5_hash)
-            .unwrap();
+        let d4_d5_root = hasher.hash_two_children(&d4_hash, &d5_hash).unwrap();
 
         assert_eq!(proof[0], d3_hash);
         assert_eq!(proof[1], d0_d1_root);
         assert_eq!(proof[2], d4_d5_root);
-
     }
-
 
     #[test]
     fn generates_inclusion_proof_for_rightmost_leaf() {
@@ -267,17 +244,11 @@ mod tests {
         let d2_hash = hasher.hash_leaf(b"d2").unwrap();
         let d3_hash = hasher.hash_leaf(b"d3").unwrap();
 
-        let d0_d1_root = hasher
-            .hash_two_children(&d0_hash, &d1_hash)
-            .unwrap();
+        let d0_d1_root = hasher.hash_two_children(&d0_hash, &d1_hash).unwrap();
 
-        let d2_d3_root = hasher
-            .hash_two_children(&d2_hash, &d3_hash)
-            .unwrap();
+        let d2_d3_root = hasher.hash_two_children(&d2_hash, &d3_hash).unwrap();
 
-        let d0_d1_d2_d3_root = hasher
-            .hash_two_children(&d0_d1_root, &d2_d3_root)
-            .unwrap();
+        let d0_d1_d2_d3_root = hasher.hash_two_children(&d0_d1_root, &d2_d3_root).unwrap();
 
         assert_eq!(proof[0], d4_hash);
         assert_eq!(proof[1], d0_d1_d2_d3_root);
@@ -317,21 +288,16 @@ mod tests {
 
         let d2_hash = hasher.hash_leaf(b"d2").unwrap();
         let d3_hash = hasher.hash_leaf(b"d3").unwrap();
-        let d2_d3_root = hasher
-            .hash_two_children(&d2_hash, &d3_hash)
-            .unwrap();
+        let d2_d3_root = hasher.hash_two_children(&d2_hash, &d3_hash).unwrap();
 
         let d4_hash = hasher.hash_leaf(b"d4").unwrap();
         let d5_hash = hasher.hash_leaf(b"d5").unwrap();
-        let d4_d5_root = hasher
-            .hash_two_children(&d4_hash, &d5_hash)
-            .unwrap();
+        let d4_d5_root = hasher.hash_two_children(&d4_hash, &d5_hash).unwrap();
 
         assert_eq!(proof[0], d1_hash);
         assert_eq!(proof[1], d2_d3_root);
         assert_eq!(proof[2], d4_d5_root);
     }
-
 
     #[test]
     fn determines_path_for_d2_in_six_leaf_tree() {
@@ -339,11 +305,7 @@ mod tests {
 
         assert_eq!(
             path,
-            vec![
-                Direction::Left,
-                Direction::Right,
-                Direction::Left,
-            ]
+            vec![Direction::Left, Direction::Right, Direction::Left,]
         );
     }
 
@@ -353,15 +315,9 @@ mod tests {
 
         assert_eq!(
             path,
-            vec![
-                Direction::Right,
-                Direction::Left,
-                Direction::Left,
-            ]
+            vec![Direction::Right, Direction::Left, Direction::Left,]
         );
     }
-
-
 
     #[test]
     fn verifies_single_leaf_proof() {
@@ -372,15 +328,8 @@ mod tests {
 
         let proof = Vec::new();
 
-        let result = verify_inclusion_proof(
-            &hasher,
-            leaf_data,
-            0,
-            1,
-            &proof,
-            &expected_root,
-        )
-        .unwrap();
+        let result =
+            verify_inclusion_proof(&hasher, leaf_data, 0, 1, &proof, &expected_root).unwrap();
 
         assert!(result);
     }
@@ -396,13 +345,7 @@ mod tests {
         let proof = generate_inclusion_proof(&tree, 0).unwrap();
         let expected_root = tree.root().unwrap();
 
-        let result = verify_inclusion_proof(
-            &hasher, b"d0", 
-            0, 
-            2, 
-            &proof, 
-            &expected_root
-        ).unwrap();
+        let result = verify_inclusion_proof(&hasher, b"d0", 0, 2, &proof, &expected_root).unwrap();
 
         assert!(result);
     }
@@ -436,15 +379,7 @@ mod tests {
         let d45 = hasher.hash_two_children(&d4, &d5).unwrap();
         assert_eq!(proof[2], d45);
 
-        let result = verify_inclusion_proof(
-            &hasher,
-            b"d2",
-            2,
-            6,
-            &proof,
-            &expected_root,
-        )
-        .unwrap();
+        let result = verify_inclusion_proof(&hasher, b"d2", 2, 6, &proof, &expected_root).unwrap();
 
         assert!(result);
     }
@@ -465,17 +400,8 @@ mod tests {
         let proof = generate_inclusion_proof(&tree, 5).unwrap();
         let expected_root = tree.root().unwrap();
 
-        let result = verify_inclusion_proof(
-            &hasher,
-            b"d5",
-            5,
-            6,
-            &proof,
-            &expected_root,
-        )
-        .unwrap();
+        let result = verify_inclusion_proof(&hasher, b"d5", 5, 6, &proof, &expected_root).unwrap();
 
         assert!(result);
     }
-
 }

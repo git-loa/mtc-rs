@@ -8,18 +8,16 @@ use crate::error::TreeError;
 use mtc_core::types::HashValue;
 use mtc_crypto::hash::HashFn;
 
-
-
 /// Returns the largest power of two strictly less than `n`.
 ///
 /// This value determines the split point for the recursive Merkle Tree
 /// Hash construction when the tree contains two or more leaves.
-pub(crate) fn largest_power_of_two_less_than (n: usize) -> usize {
+pub(crate) fn largest_power_of_two_less_than(n: usize) -> usize {
     assert!(n >= 2);
 
     let mut k = 1;
-    while k*2 < n {
-       k *= 2; 
+    while k * 2 < n {
+        k *= 2;
     }
 
     k
@@ -36,7 +34,7 @@ pub(crate) fn largest_power_of_two_less_than (n: usize) -> usize {
 ///
 /// The tree stores the configured hash function and the hashes of its
 /// leaf records.
-pub  struct  MerkleTree<H: HashFn> {
+pub struct MerkleTree<H: HashFn> {
     /// Cryptographic hash function used by the tree.
     hasher: H,
 
@@ -51,14 +49,14 @@ impl<H: HashFn> MerkleTree<H> {
             hasher,
             leaves: Vec::new(),
         }
-    }    
+    }
 
     // Adds a new leaf to the Merkle tree.
     ///
     /// The input is hashed using the configured hash function before
     /// the resulting hash is stored. Empty leaf data is valid.
     pub fn append(&mut self, data: &[u8]) -> Result<(), TreeError> {
-        let  leaf_hash = self.hasher.hash_leaf(data)?;
+        let leaf_hash = self.hasher.hash_leaf(data)?;
         self.leaves.push(leaf_hash);
 
         Ok(())
@@ -69,31 +67,26 @@ impl<H: HashFn> MerkleTree<H> {
         self.leaves.len()
     }
 
-     /// Returns a read-only view of the stored leaf hashes.
+    /// Returns a read-only view of the stored leaf hashes.
     pub fn leaves(&self) -> &[HashValue] {
         &self.leaves
     }
-
 
     /// Computes the Merkle root of the tree.
     ///
     /// Empty trees use the empty-tree hash. Multiple leaves are split
     /// according to the recursive Merkle Tree Hash construction.
     pub fn root(&self) -> Result<HashValue, TreeError> {
-         self.root_for_slice(&self.leaves)
+        self.root_for_slice(&self.leaves)
     }
 
     /// Recursively computes the Merkle root of a slice of leaf hashes.
     ///
     /// Empty and single-leaf slices are base cases. Multiple leaves are
     /// split according to the Merkle Tree Hash construction.
-    pub(crate) fn root_for_slice(
-        &self, 
-        leaves: &[HashValue],
-    ) -> Result<HashValue, TreeError> {
-
+    pub(crate) fn root_for_slice(&self, leaves: &[HashValue]) -> Result<HashValue, TreeError> {
         if leaves.is_empty() {
-           return Ok(self.hasher.hash_empty()?);
+            return Ok(self.hasher.hash_empty()?);
         }
 
         if leaves.len() == 1 {
@@ -103,7 +96,6 @@ impl<H: HashFn> MerkleTree<H> {
         let n = leaves.len();
         let k = largest_power_of_two_less_than(n);
 
-
         // Left and Right Slices
         let left = &leaves[..k];
         let right = &leaves[k..];
@@ -112,16 +104,11 @@ impl<H: HashFn> MerkleTree<H> {
         let right_root = self.root_for_slice(right)?;
 
         // Compute the root
-        let root = self.hasher.hash_two_children(
-            &left_root, 
-            &right_root
-        )?;
+        let root = self.hasher.hash_two_children(&left_root, &right_root)?;
 
         Ok(root)
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -132,9 +119,6 @@ mod tests {
     fn append_adds_leaf_to_tree() {
         let mut tree = MerkleTree::new(Blake3Hash);
         tree.append(b"Certificate").unwrap();
-        
-        //println!("Number of leaves: {}", tree.len());
-        //println!("Leaves: {:?}", tree.leaves());
 
         assert_eq!(tree.len(), 1);
     }
@@ -145,7 +129,6 @@ mod tests {
         let root = tree.root().unwrap();
         assert_eq!(root.algorithm(), HashAlgorithm::Blake3);
     }
-
 
     #[test]
     fn single_leaf_is_root() {
@@ -181,9 +164,7 @@ mod tests {
         let left = &tree.leaves()[0];
         let right = &tree.leaves()[1];
 
-        let expected = Blake3Hash
-            .hash_two_children(left, right)
-            .unwrap();
+        let expected = Blake3Hash.hash_two_children(left, right).unwrap();
 
         assert_eq!(root, expected);
     }
@@ -209,7 +190,6 @@ mod tests {
         assert_eq!(root, expected);
     }
 
-
     #[test]
     fn four_leaves_use_correct_split() {
         let mut tree = MerkleTree::new(Blake3Hash);
@@ -229,13 +209,10 @@ mod tests {
             .hash_two_children(&tree.leaves()[2], &tree.leaves()[3])
             .unwrap();
 
-        let expected = Blake3Hash
-            .hash_two_children(&left, &right)
-            .unwrap();
+        let expected = Blake3Hash.hash_two_children(&left, &right).unwrap();
 
         assert_eq!(root, expected);
     }
-
 
     #[test]
     fn five_leaves_use_correct_recursive_structure() {
@@ -250,16 +227,20 @@ mod tests {
         let root = tree.root().unwrap();
 
         let left_left = Blake3Hash
-            .hash_two_children(&tree.leaves()[0], &tree.leaves()[1]).unwrap();
+            .hash_two_children(&tree.leaves()[0], &tree.leaves()[1])
+            .unwrap();
 
         let left_right = Blake3Hash
-            .hash_two_children(&tree.leaves()[2], &tree.leaves()[3]).unwrap();
+            .hash_two_children(&tree.leaves()[2], &tree.leaves()[3])
+            .unwrap();
 
         let left = Blake3Hash
-            .hash_two_children(&left_left, &left_right).unwrap();
+            .hash_two_children(&left_left, &left_right)
+            .unwrap();
 
         let expected = Blake3Hash
-            .hash_two_children(&left, &tree.leaves()[4]).unwrap();
+            .hash_two_children(&left, &tree.leaves()[4])
+            .unwrap();
 
         assert_eq!(root, expected);
     }
@@ -267,7 +248,7 @@ mod tests {
     #[test]
     fn empty_leaf_is_different_from_empty_tree() {
         let empty_tree = MerkleTree::new(Blake3Hash);
-        
+
         let mut one_empty_leaf = MerkleTree::new(Blake3Hash);
         one_empty_leaf.append(b"").unwrap();
 
