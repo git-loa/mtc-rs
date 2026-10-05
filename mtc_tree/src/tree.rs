@@ -14,7 +14,7 @@ use mtc_crypto::hash::HashFn;
 ///
 /// This value determines the split point for the recursive Merkle Tree
 /// Hash construction when the tree contains two or more leaves.
-fn largest_power_of_two_less_than (n: usize) -> usize {
+pub(crate) fn largest_power_of_two_less_than (n: usize) -> usize {
     assert!(n >= 2);
 
     let mut k = 1;
@@ -87,7 +87,7 @@ impl<H: HashFn> MerkleTree<H> {
     ///
     /// Empty and single-leaf slices are base cases. Multiple leaves are
     /// split according to the Merkle Tree Hash construction.
-    fn root_for_slice(
+    pub(crate) fn root_for_slice(
         &self, 
         leaves: &[HashValue],
     ) -> Result<HashValue, TreeError> {
