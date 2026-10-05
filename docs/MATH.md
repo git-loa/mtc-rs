@@ -117,15 +117,7 @@ $$
 The root is then computed as
 
 $$
-MTH(D)
-=
-H\left(
-0x01
-\Vert
-MTH(D[0:k])
-\Vert
-MTH(D[k:n])
-\right).
+MTH(D) = H\left(0x01 \Vert MTH(D[0:k])\Vert MTH(D[k:n])\right).
 $$
 
 The same rule is applied recursively to each subtree until every subtree contains either zero or one leaf.
@@ -173,31 +165,15 @@ The resulting structure is:
 Therefore,
 
 $$
-MTH(D)
-=
-H\left(
-0x01
-\Vert
-MTH(D[0:4])
-\Vert
-MTH(D[4:6])
-\right).
+MTH(D)=H\left(0x01\Vert MTH(D[0:4])\Vert MTH(D[4:6])\right).
 $$
 
 The same recursive rule is then applied to each subtree.
 
 For example,
 
-$$
-MTH(D[0:4])
-=
-H\left(
-0x01
-\Vert
-MTH(D[0:2])
-\Vert
-MTH(D[2:4])
-\right).
+$$ 
+MTH(D[0:4]) = H\left(0x01 \Vert MTH(D[0:2])\Vert MTH(D[2:4])\right).
 $$
 
 This recursive structure is important when generating and verifying inclusion proofs.
@@ -208,7 +184,7 @@ This recursive structure is important when generating and verifying inclusion pr
 
 An inclusion proof allows a verifier to demonstrate that a particular leaf belongs to a tree without receiving the entire tree.
 
-For leaf \(d_i\), the verifier first computes the leaf hash
+For leaf $d_i$, the verifier first computes the leaf hash
 
 $$
 H(0x00 \Vert d_i).
