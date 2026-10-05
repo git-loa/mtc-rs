@@ -24,39 +24,33 @@ impl HashFn for Blake3Hash {
     fn hash_empty(&self) -> Result<HashValue, CryptoError> {
         let digest: [u8; 32] = blake3::hash(b"").into();
 
-        HashValue::new(
-            HashAlgorithm::Blake3,
-            digest.to_vec(),
-        ).map_err(|_| CryptoError::InvalidHashLength)
+        HashValue::new(HashAlgorithm::Blake3, digest.to_vec())
+            .map_err(|_| CryptoError::InvalidHashLength)
     }
 
     /// Computes a leaf hash using `0x00 || data`
     fn hash_leaf(&self, data: &[u8]) -> Result<HashValue, CryptoError> {
         // Domain separation: 0x00 || data
-        let mut buffer =Vec::with_capacity(1 + data.len());
+        let mut buffer = Vec::with_capacity(1 + data.len());
         buffer.push(0x00);
         buffer.extend_from_slice(data);
 
         let digest: [u8; 32] = blake3::hash(&buffer).into();
 
-        HashValue::new(
-            HashAlgorithm::Blake3, 
-            digest.to_vec()
-        ).map_err(|_| CryptoError::InvalidHashLength)
+        HashValue::new(HashAlgorithm::Blake3, digest.to_vec())
+            .map_err(|_| CryptoError::InvalidHashLength)
     }
 
     /// Computes an internal-node hash using `0x01 || left || right`.
     ///
     /// Both child hashes must use BLAKE3.
     fn hash_two_children(
-        &self, 
-        left: &HashValue, 
+        &self,
+        left: &HashValue,
         right: &HashValue,
     ) -> Result<HashValue, CryptoError> {
-        
         // Ensure both child hashes use the configured algorithm.
-        if left.algorithm() != self.algorithm() || right.algorithm() != self.algorithm()
-        { 
+        if left.algorithm() != self.algorithm() || right.algorithm() != self.algorithm() {
             return Err(CryptoError::HashAlgorithmMismatch);
         }
 
@@ -68,14 +62,10 @@ impl HashFn for Blake3Hash {
 
         let digest: [u8; 32] = blake3::hash(&buffer).into();
 
-        HashValue::new(
-            HashAlgorithm::Blake3,
-            digest.to_vec(),
-        ).map_err(|_| CryptoError::InvalidHashLength)
+        HashValue::new(HashAlgorithm::Blake3, digest.to_vec())
+            .map_err(|_| CryptoError::InvalidHashLength)
     }
 }
-
-
 
 // #######################################
 // ############## Testing ################
@@ -115,15 +105,9 @@ mod tests {
     fn rejects_hash_with_wrong_algorithm() {
         let hasher = Blake3Hash;
 
-        let sha256_hash = HashValue::new(
-            HashAlgorithm::Sha256,
-            vec![0u8; 32],
-        ).unwrap();
+        let sha256_hash = HashValue::new(HashAlgorithm::Sha256, vec![0u8; 32]).unwrap();
 
-        let result = hasher.hash_two_children(
-            &sha256_hash, 
-            &sha256_hash,
-        );
+        let result = hasher.hash_two_children(&sha256_hash, &sha256_hash);
 
         assert_eq!(result, Err(CryptoError::HashAlgorithmMismatch));
     }

@@ -21,7 +21,7 @@ enum Direction {
 /// `H` can be `Blake3Hash` from `mtc_crypto`.
 ///
 /// The returned proof contains sibling subtree hashes in leaf-to-root order.
-pub(crate) fn generate_inclusion_proof<H: HashFn>(
+pub fn generate_inclusion_proof<H: HashFn>(
     tree: &MerkleTree<H>,
     leaf_index: usize,
 ) -> Result<Vec<HashValue>, TreeError> {
@@ -122,7 +122,7 @@ fn determine_proof_path(leaf_index: usize, tree_size: usize) -> Result<Vec<Direc
 /// The proof and its corresponding directions are processed in leaf-to-root
 /// order. Returns `Ok(true)` when the reconstructed root matches
 /// `expected_root`, or `Ok(false)` when it does not.
-pub(crate) fn verify_inclusion_proof<H: HashFn>(
+pub fn verify_inclusion_proof<H: HashFn>(
     hasher: &H,
     leaf_data: &[u8],
     leaf_index: usize,

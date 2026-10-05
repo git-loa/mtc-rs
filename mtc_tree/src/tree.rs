@@ -67,8 +67,13 @@ impl<H: HashFn> MerkleTree<H> {
         self.leaves.len()
     }
 
+    /// Returns `true` if the tree contains no leaves.
+    pub fn is_empty(&self) -> bool {
+        self.leaves.is_empty()
+    }
+
     /// Returns a read-only view of the stored leaf hashes.
-    pub fn leaves(&self) -> &[HashValue] {
+    pub(crate) fn leaves(&self) -> &[HashValue] {
         &self.leaves
     }
 
@@ -115,6 +120,25 @@ mod tests {
     use super::*;
     use mtc_core::types::HashAlgorithm;
     use mtc_crypto::blake3::Blake3Hash;
+
+    #[test]
+    fn new_tree_is_empty() {
+        let tree = MerkleTree::new(Blake3Hash);
+
+        assert!(tree.is_empty());
+        assert_eq!(tree.len(), 0);
+    }
+
+    #[test]
+    fn tree_is_not_empty_after_append() {
+        let mut tree = MerkleTree::new(Blake3Hash);
+
+        tree.append(b"hello").unwrap();
+
+        assert!(!tree.is_empty());
+        assert_eq!(tree.len(), 1);
+    }
+
     #[test]
     fn append_adds_leaf_to_tree() {
         let mut tree = MerkleTree::new(Blake3Hash);

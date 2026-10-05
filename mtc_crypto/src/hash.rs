@@ -4,13 +4,13 @@
 //! functions used by the Merkle tree.
 
 use crate::error::CryptoError;
-use mtc_core::types::{HashValue, HashAlgorithm};
+use mtc_core::types::{HashAlgorithm, HashValue};
 
 /// Abstraction over cryptographic hash functions.
 ///
 /// Implementations provide hashing operations for empty trees,
 /// leaf data, and internal Merkle tree nodes.
-pub trait HashFn{
+pub trait HashFn {
     /// Returns the algorithm implemented by this hash function.
     fn algorithm(&self) -> HashAlgorithm;
 
@@ -22,10 +22,8 @@ pub trait HashFn{
 
     /// Computes a parent hash from two child hashes.
     fn hash_two_children(
-        &self, 
-        left: &HashValue, 
-        right: &HashValue
+        &self,
+        left: &HashValue,
+        right: &HashValue,
     ) -> Result<HashValue, CryptoError>;
 }
-
-
