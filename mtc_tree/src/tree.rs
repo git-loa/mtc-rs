@@ -1,8 +1,11 @@
 //! Merkle tree construction.
 //!
-//! This module provides the core Merkle tree structure used by MTC.
-//! The tree uses a configurable cryptographic hash function and follows
-//! the recursive Merkle Tree Hash construction.
+//! This module provides the [`MerkleTree`] structure for storing leaf hashes
+//! and computing Merkle roots.
+//!
+//! The tree uses a configurable [`HashFn`] implementation and recursively
+//! splits its leaves according to the Merkle Tree Hash construction.
+//! An empty tree uses the configured hash function's empty-tree hash.
 
 use crate::error::TreeError;
 use mtc_core::types::HashValue;
@@ -12,6 +15,10 @@ use mtc_crypto::hash::HashFn;
 ///
 /// This value determines the split point for the recursive Merkle Tree
 /// Hash construction when the tree contains two or more leaves.
+///
+/// # Panics
+///
+/// Panics if `n` is less than 2.
 pub(crate) fn largest_power_of_two_less_than(n: usize) -> usize {
     assert!(n >= 2);
 
@@ -23,17 +30,11 @@ pub(crate) fn largest_power_of_two_less_than(n: usize) -> usize {
     k
 }
 
-/// A Merkle tree parameterized by a cryptographic hash function.
-///
-/// `H` is the Rust type that implements the [`HashFn`] trait and provides
-/// the hashing operations used by the tree. For example, `H` can be
-/// [`Blake3Hash`] when the tree is constructed with `Blake3Hash`.
-///
-/// The `H: HashFn` constraint requires the supplied type to implement
-/// the `HashFn` trait.
+/// A Merkle tree parameterized by a hash function.
 ///
 /// The tree stores the configured hash function and the hashes of its
-/// leaf records.
+/// leaves. Leaf data is hashed when appended, and the root is computed
+/// from the stored leaf hashes when requested.
 pub struct MerkleTree<H: HashFn> {
     /// Cryptographic hash function used by the tree.
     hasher: H,
@@ -43,7 +44,7 @@ pub struct MerkleTree<H: HashFn> {
 }
 
 impl<H: HashFn> MerkleTree<H> {
-    /// Creates an empty Merke tree using the given hash function.
+    /// Creates an empty Merke tree using the specified hash function.
     pub fn new(hasher: H) -> Self {
         Self {
             hasher,
@@ -51,10 +52,14 @@ impl<H: HashFn> MerkleTree<H> {
         }
     }
 
-    // Adds a new leaf to the Merkle tree.
+    /// Hashes and appends a new leaf to the tree.
     ///
-    /// The input is hashed using the configured hash function before
-    /// the resulting hash is stored. Empty leaf data is valid.
+    /// Empty leaf data is valid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TreeError`] if the configured hash function fails to
+    /// compute the leaf hash.
     pub fn append(&mut self, data: &[u8]) -> Result<(), TreeError> {
         let leaf_hash = self.hasher.hash_leaf(data)?;
         self.leaves.push(leaf_hash);
@@ -79,8 +84,13 @@ impl<H: HashFn> MerkleTree<H> {
 
     /// Computes the Merkle root of the tree.
     ///
-    /// Empty trees use the empty-tree hash. Multiple leaves are split
-    /// according to the recursive Merkle Tree Hash construction.
+    /// Returns the empty-tree hash when the tree contains no leaves.
+    /// For a nonempty tree, the root is computed recursively from the
+    /// stored leaf hashes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`TreeError`] if a cryptographic operation fails.
     pub fn root(&self) -> Result<HashValue, TreeError> {
         self.root_for_slice(&self.leaves)
     }
@@ -114,6 +124,10 @@ impl<H: HashFn> MerkleTree<H> {
         Ok(root)
     }
 }
+
+// ########################
+// ###### Testing #########
+// ########################
 
 #[cfg(test)]
 mod tests {

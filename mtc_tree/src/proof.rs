@@ -1,7 +1,10 @@
-//! Merkle inclusion proofs.
+//! Merkle tree inclusion-proof generation and verification.
 //!
-//! This module implements the inclusion-proof algorithm used by
-//! Certificate Transparency and MTC.
+//! This module generates inclusion proofs for leaves in a Merkle tree
+//! and verifies those proofs against an expected root hash.
+//!
+//! The tree structure and hashing rules must be consistent between
+//! proof generation and verification.
 
 use crate::error::TreeError;
 use crate::tree::{MerkleTree, largest_power_of_two_less_than};
@@ -16,11 +19,17 @@ enum Direction {
 
 /// Generates an inclusion proof for the leaf at `leaf_index`.
 ///
-/// `H` is the concrete Rust type that implements the [`HashFn`] trait
-/// and provides the hashing operations used by the Merkle tree. For example,
-/// `H` can be `Blake3Hash` from `mtc_crypto`.
+/// The returned proof contains sibling subtree hashes in leaf-to-root
+/// order. The proof can be used to verify the leaf against the root of
+/// the same tree, provided the corresponding leaf data is available.
 ///
-/// The returned proof contains sibling subtree hashes in leaf-to-root order.
+/// # Errors
+///
+/// Returns [`TreeError::InvalidLeafIndex`] if `leaf_index` is outside
+/// the tree's valid leaf indices.
+///
+/// Returns a [`TreeError`] if a cryptographic operation required to
+/// generate the proof fails.
 pub fn generate_inclusion_proof<H: HashFn>(
     tree: &MerkleTree<H>,
     leaf_index: usize,
@@ -117,11 +126,28 @@ fn determine_proof_path(leaf_index: usize, tree_size: usize) -> Result<Vec<Direc
     Ok(path)
 }
 
-/// Verifies an inclusion proof for a leaf against an expected Merkle root.
+/// Verifies an inclusion proof for leaf data against an expected Merkle root.
 ///
-/// The proof and its corresponding directions are processed in leaf-to-root
-/// order. Returns `Ok(true)` when the reconstructed root matches
-/// `expected_root`, or `Ok(false)` when it does not.
+/// The verifier hashes `leaf_data` and combines the resulting hash with
+/// the sibling hashes in `proof`, following the tree path determined by
+/// `leaf_index` and `tree_size`.
+///
+/// Returns `Ok(true)` if the reconstructed root equals `expected_root`,
+/// or `Ok(false)` if the roots differ. A successful result establishes
+/// consistency with the supplied root; it does not establish that the
+/// root itself is trustworthy.
+///
+/// # Errors
+///
+/// Returns [`TreeError::InvalidTreeSize`] if `tree_size` is zero.
+///
+/// Returns [`TreeError::InvalidLeafIndex`] if `leaf_index` is outside
+/// the tree's valid leaf indices.
+///
+/// Returns [`TreeError::InvalidProofLength`] if the proof contains an
+/// unexpected number of sibling hashes.
+///
+/// Returns a [`TreeError`] if a cryptographic operation fails.
 pub fn verify_inclusion_proof<H: HashFn>(
     hasher: &H,
     leaf_data: &[u8],

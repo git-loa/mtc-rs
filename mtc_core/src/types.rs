@@ -1,17 +1,14 @@
-//! Core data structures shared across the MTC system.
+//! Shared data structures for cryptographic values and MTC certificate data.
 //!
-//! This module defines types for cryptographic values, Merkle tree state,
-//! signatures, and MTC certificate data.
-//!
-//! The types are independent of concrete cryptographic implementations.
-//! Cryptographic operations are provided by higher-level crates such as
-//! `mtc_crypto`.
+//! This module defines hash values, Merkle tree heads, signature-related
+//! types, and MTC certificate data. These types are independent of concrete
+//! cryptographic implementations; cryptographic operations are provided by
+//! other components.
 
-/// Identifies the cryptographic hash algorithm associated with a hash value.
+/// Identifies the hash algorithm associated with a [`HashValue`].
 ///
-/// The enum records the algorithm used to produce a [`HashValue`].
-/// Concrete hash implementations are provided through the `HashFn`
-/// abstraction in the `mtc_crypto` crate. Currently, BLAKE3 is implemented.
+/// This enum records an algorithm identifier; it does not implement the
+/// algorithm. The `mtc_crypto` crate currently provides a BLAKE3 implementation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashAlgorithm {
     /// SHA-256.
@@ -27,9 +24,10 @@ pub enum HashAlgorithm {
     Blake3,
 }
 
-/// A cryptographic hash value and the algorithm that produced it.
+/// Stores a digest and the identifier of the hash algorithm associated with it.
 ///
-/// The digest length is validated when the value is created.
+/// The digest length is checked when a value is constructed. This check does
+/// not establish that the bytes were actually produced by the identified algorithm.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HashValue {
     /// Algorithm used to produce the digest.
@@ -40,9 +38,26 @@ pub struct HashValue {
 }
 
 impl HashValue {
-    /// Creates a hash value and validates its digest length.
+    /// Creates a hash value after validating the digest length.
     ///
-    /// Returns an error if the length does not match the selected algorithm.
+    /// `algorithm` identifies the hash algorithm associated with `bytes`.
+    /// The bytes are stored as supplied if their length matches the expected
+    /// digest length; this constructor does not recompute or authenticate the digest.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `bytes` has a length different from the expected
+    /// digest length for `algorithm`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use mtc_core::types::{HashAlgorithm, HashValue};
+    ///
+    /// let digest = vec![0_u8; 32];
+    /// let value = HashValue::new(HashAlgorithm::Sha256, digest);
+    /// assert!(value.is_ok());
+    /// ```
     pub fn new(algorithm: HashAlgorithm, bytes: Vec<u8>) -> Result<Self, String> {
         // Validates the digest length for the selected algorithm.
         let expected_length = match algorithm {
@@ -64,48 +79,54 @@ impl HashValue {
         Ok(Self { algorithm, bytes })
     }
 
-    /// Returns the algorithm associated with the hash value.
+    /// Returns the algorithm identifier associated with the hash value.
     pub fn algorithm(&self) -> HashAlgorithm {
         self.algorithm
     }
 
-    /// Returns a read-only view of the hash bytes.
+    /// Returns the digest bytes as a borrowed slice.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 }
 
-///Represents the root and metadata of a Merkle tree.
+/// Represents the root hash and metadata of a Merkle tree.
+///
+/// The timestamp's unit and interpretation are defined by the surrounding
+/// protocol or application; this type does not enforce them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeHead {
-    /// Merkle tree root hash.
+    /// Root hash representing the tree contents.
     root: HashValue,
 
-    /// Number of leaves represented by the tree.
+    /// Number of leaves represented by this tree head.
     size: u64,
 
-    /// Timestamp associated with the tree state.
+    //// Timestamp associated with this tree state, in the unit chosen by the caller.
     timestamp: u64,
 }
 
 impl TreeHead {
-    /// Returns the Merkle tree root.
+    /// Returns a reference to the Merkle tree root hash.
     pub fn root(&self) -> &HashValue {
         &self.root
     }
 
-    /// Returns the number of leaves in the tree.
+    /// Returns the number of leaves represented by this tree head.
     pub fn size(&self) -> u64 {
         self.size
     }
 
-    /// Returns the timestamp associated with the tree state.
+    /// Returns the timestamp associated with this tree head.
     pub fn timestamp(&self) -> u64 {
         self.timestamp
     }
 }
 
-/// Identifies the signature algorithm associated with a signature.
+/// Identifies the signature algorithm associated with a [`Signature`].
+///
+/// These variants are identifiers only; they do not provide signing or
+/// verification implementations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureAlgorithm {
     /// ECDSA.
@@ -118,36 +139,47 @@ pub enum SignatureAlgorithm {
     SlhDsa,
 }
 
-/// A cryptographic signature and the algorithm that produced it.
+/// Stores signature bytes and the identifier of the associated algorithm.
 ///
-/// Signature validation is handled by the cryptographic layer.
+/// This type represents signature data; it does not validate the signature
+/// or establish its authenticity. Signature verification is performed by a
+/// component that implements the relevant cryptographic algorithm.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
+    /// Algorithm identified as having produced the signature.
     algorithm: SignatureAlgorithm,
+
+    /// Raw signature bytes.
     bytes: Vec<u8>,
 }
 
 impl Signature {
-    /// Creates a signature from an algorithm and its raw bytes.
+    /// Creates a signature value from an algorithm identifier and raw bytes.
+    ///
+    /// The supplied bytes are stored without checking whether they form a
+    /// valid signature for the selected algorithm.
     pub fn new(algorithm: SignatureAlgorithm, bytes: Vec<u8>) -> Self {
         Self { algorithm, bytes }
     }
 
-    /// Returns the algorithm associated with the signature.
+    /// Returns the signature algorithm identifier.
     pub fn algorithm(&self) -> SignatureAlgorithm {
         self.algorithm
     }
 
-    /// Returns a read-only view of the signature bytes.
+    /// Returns the raw signature bytes as a borrowed slice.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 }
 
-/// A Merkle tree head together with its cryptographic signature.
+/// A Merkle tree head together with its associated signature.
+///
+/// This type groups the tree head and signature; it does not verify the
+/// signature or establish trust in the tree head.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignedTreeHead {
-    /// Merkle tree state being authenticated.
+    /// Merkle tree state associated with the signature.
     tree_head: TreeHead,
 
     /// Signature associated with the tree head.
@@ -156,6 +188,8 @@ pub struct SignedTreeHead {
 
 impl SignedTreeHead {
     /// Creates a signed tree head from a tree head and signature.
+    ///
+    /// This signature does not verify the signature; it simply stores the provided values.
     pub fn new(tree_head: TreeHead, signature: Signature) -> Self {
         Self {
             tree_head,
@@ -163,7 +197,7 @@ impl SignedTreeHead {
         }
     }
 
-    /// Returns the authenticated tree head.
+    /// Returns the tree head associated with the signature.
     pub fn tree_head(&self) -> &TreeHead {
         &self.tree_head
     }
@@ -174,22 +208,27 @@ impl SignedTreeHead {
     }
 }
 
-/// An MTC certificate containing certificate data,
-/// a Merkle inclusion proof, and a signed tree head.
+/// Groups certificate data, a Merkle inclusion proof, and a signed tree head.
+///
+/// This type does not verify the inclusion proof, verify the tree-head
+/// signature, or establish trust in the supplied tree head.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MtcCertificate {
     /// Certificate data represented by the Merkle tree.
     body: Vec<u8>,
 
-    /// Hash values used for Merkle inclusion verification.
+    /// Sibling hashes used to reconstruct a Merkle root during inclusion verification.
     proof: Vec<HashValue>,
 
-    /// Authenticated tree state associated with the certificate.
+    /// Tree head and its associated signature; neither is verified by this type.
     signed_tree_head: SignedTreeHead,
 }
 
 impl MtcCertificate {
-    /// Creates an MTC certificate from its components.
+    /// Creates an MTC certificate value from its components.
+    ///
+    /// The supplied data is stored without verifying the inclusion proof or
+    /// the signature associated with the tree head.
     pub fn new(body: Vec<u8>, proof: Vec<HashValue>, signed_tree_head: SignedTreeHead) -> Self {
         Self {
             body,
@@ -198,32 +237,26 @@ impl MtcCertificate {
         }
     }
 
-    /// Returns a read-only view of the certificate body.
+    /// Returns the certificate body as a borrowed byte slice.
     pub fn body(&self) -> &[u8] {
         &self.body
     }
 
-    /// Returns a read-only view of the Merkle proof.
+    /// Returns the inclusion proof as a borrowed slice of sibling hashes.
     pub fn proof(&self) -> &[HashValue] {
         &self.proof
     }
 
-    /// Returns the signed tree head.
+    /// Returns the tree head and associated signature.
     pub fn signed_tree_head(&self) -> &SignedTreeHead {
         &self.signed_tree_head
     }
 }
 
-//###############################
-//######## UNIT TESTING #########
-//###############################
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Testing that hash algorithm is Sha256 with
-    //digest size equal to 23.
     #[test]
     fn sha256_hash_with32_bytes_is_valid() {
         let bytes = vec![0u8; 32];
@@ -243,7 +276,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // Testing attirbute-hiding (Encapsulation)
     #[test]
     fn hash_value_exposes_algorithm_and_bytes() {
         let bytes = vec![0u8; 32];
@@ -253,9 +285,7 @@ mod tests {
         assert_eq!(hash.algorithm(), HashAlgorithm::Sha256);
         assert_eq!(hash.bytes(), bytes.as_slice());
     }
-    //###################################################
-    //######### Testing Units for TreeHead ##############
-    //###################################################
+
     #[test]
     fn tree_head_holds_hash_and_metadata() {
         let hash = HashValue::new(HashAlgorithm::Sha256, vec![0u8; 32]).unwrap();
@@ -287,11 +317,6 @@ mod tests {
         assert_eq!(tree_head.timestamp(), 1_757_000_000);
     }
 
-    //#######################################
-    //################ Signature ############
-    //#######################################
-
-    // Testing signature algorithm
     #[test]
     fn signature_algorithm_can_be_identified() {
         let algorithm = SignatureAlgorithm::MlDsa;
@@ -325,7 +350,6 @@ mod tests {
         assert_eq!(signed_tree_head.signature(), &signature);
     }
 
-    //####### MtcCertificate ##########
     #[test]
     fn mtc_certificate_exposes_body_proof_and_signed_tree_head() {
         let body = vec![1u8, 2u8, 3u8];

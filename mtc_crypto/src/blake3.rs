@@ -1,8 +1,16 @@
-//! BLAKE3 implementation of the `HashFn` trait.
+//! BLAKE3 implementation of the [`HashFn`] trait.
 //!
-//! Leaf and internal-node inputs use domain separation:
-//! - `0x00` for leaf data.
-//! - `0x01` for internal nodes.
+//! This module computes hashes for empty trees, leaf data, and internal
+//! Merkle tree nodes.
+//!
+//! Domain separation distinguishes leaf data from internal nodes:
+//!
+//! - `0x00` prefixes leaf data.
+//! - `0x01` prefixes the concatenated child hashes of an internal node.
+//!
+//! These prefixes are part of this implementation's hashing convention.
+//! Protocol interoperability requires agreement on the complete hashing
+//! rules, including the hash algorithm and input encoding.
 
 use blake3;
 
@@ -10,7 +18,9 @@ use crate::error::CryptoError;
 use crate::hash::HashFn;
 use mtc_core::types::{HashAlgorithm, HashValue};
 
-///BLAKE3 hash function with domain separation for Merlke tree nodes.
+/// BLAKE3 hash implementation for Merkle tree operations.
+///
+/// Leaf and internal-node inputs use distinct domain-separation prefixes.
 #[derive(Debug)]
 pub struct Blake3Hash;
 
@@ -20,7 +30,11 @@ impl HashFn for Blake3Hash {
         HashAlgorithm::Blake3
     }
 
-    /// Computes the hash representing an empty tree.
+    /// Computes the hash representing an empty Merkle tree.
+    ///
+    /// The empty-tree hash is BLAKE3 applied to an empty byte string.
+    /// It is distinct from the hash of an empty leaf, which includes
+    /// the leaf domain-separation prefix.
     fn hash_empty(&self) -> Result<HashValue, CryptoError> {
         let digest: [u8; 32] = blake3::hash(b"").into();
 
@@ -28,7 +42,15 @@ impl HashFn for Blake3Hash {
             .map_err(|_| CryptoError::InvalidHashLength)
     }
 
-    /// Computes a leaf hash using `0x00 || data`
+    /// Computes the hash of a Merkle tree leaf.
+    ///
+    /// The input is prefixed with `0x00` before BLAKE3 hashing, separating
+    /// leaf hashing from internal-node hashing.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`CryptoError`] if constructing the resulting [`HashValue`]
+    /// fails validation.
     fn hash_leaf(&self, data: &[u8]) -> Result<HashValue, CryptoError> {
         // Domain separation: 0x00 || data
         let mut buffer = Vec::with_capacity(1 + data.len());
@@ -41,9 +63,20 @@ impl HashFn for Blake3Hash {
             .map_err(|_| CryptoError::InvalidHashLength)
     }
 
-    /// Computes an internal-node hash using `0x01 || left || right`.
+    /// Computes the hash of an internal Merkle tree node.
+    ///
+    /// The input is constructed by prefixing `0x01` to the concatenated
+    /// bytes of the left and right child hashes, in that order.
     ///
     /// Both child hashes must use BLAKE3.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CryptoError::HashAlgorithmMismatch`] if either child hash
+    /// uses an algorithm other than BLAKE3.
+    ///
+    /// Returns [`CryptoError::InvalidHashLength`] if constructing the
+    /// resulting [`HashValue`] fails validation.
     fn hash_two_children(
         &self,
         left: &HashValue,
@@ -67,16 +100,11 @@ impl HashFn for Blake3Hash {
     }
 }
 
-// #######################################
-// ############## Testing ################
-// #######################################
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
 
-    // Testing determinism.
     #[test]
     fn same_input_produces_same_hash() {
         let hasher = Blake3Hash;

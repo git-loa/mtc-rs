@@ -1,37 +1,19 @@
-//! # mtc_core
+//! Shared data structures for the Merkle Tree Certificate (MTC) system.
 //!
-//! ## Purpose
+//! This crate defines common types for hash values, Merkle tree heads,
+//! signatures, and MTC certificate data. These types are shared across
+//! the system's cryptographic, tree, certificate-authority, and client
+//! components.
 //!
-//! Defines the shared data structures used across the MTC system.
-//!
-//! ## Responsibilities
-//!
-//! - Represent hash values and hash algorithm identifiers.
-//! - Represent Merkle tree heads and signed tree heads.
-//! - Define shared signature-related data types.
-//! - Represent MTC certificate data.
-//!
-//! ## Design
-//!
-//! This crate provides common data structures for the cryptographic,
-//! Merkle-tree, certificate-authority, and client components.
 //! Fields are encapsulated where appropriate, with accessors providing
 //! read-only access to internal data.
 //!
-//! ## Boundaries
-//!
-//! This crate defines shared types. It does not construct Merkle trees,
-//! implement hash algorithms, generate digital signatures, or verify
-//! certificates.
-//!
-//! ## Status
-//!
-//! The core data structures are implemented. Additional types or metadata
-//! may be introduced as the architecture develops.
-//!
-//! ## Future extensions
+//! This crate defines data structures rather than implementing
+//! cryptographic operations. Hashing, signature generation, signature
+//! verification, and Merkle tree construction are handled by other
+//! components.
 //!
 //! Serialization support, protocol-specific metadata, and additional
-//! algorithm identifiers may be considered when justified by the design.
+//! algorithm identifiers may be introduced as the architecture develops.
 
 pub mod types;

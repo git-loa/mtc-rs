@@ -12,7 +12,7 @@ pub enum CryptoError {
     #[error("Hash algorithms do not match.")]
     HashAlgorithmMismatch,
 
-    /// A hash value has an invalid length.
+    /// A hash value has a length that is invalid for its algorithm.
     #[error("Invalid hash length.")]
     InvalidHashLength,
 }
