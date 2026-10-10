@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mtc_core = {path = "../mtc_core"}
+mtc_crypto = { path = "../mtc_crypto" }
+mtc_tree = { path = "../mtc_tree" }
