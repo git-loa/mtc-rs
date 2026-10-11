@@ -44,7 +44,7 @@ pub struct MerkleTree<H: HashFn> {
 }
 
 impl<H: HashFn> MerkleTree<H> {
-    /// Creates an empty Merke tree using the specified hash function.
+    /// Creates an empty Merkle tree using the specified hash function.
     pub fn new(hasher: H) -> Self {
         Self {
             hasher,

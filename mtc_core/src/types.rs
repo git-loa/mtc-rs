@@ -9,6 +9,8 @@
 ///
 /// This enum records an algorithm identifier; it does not implement the
 /// algorithm. The `mtc_crypto` crate currently provides a BLAKE3 implementation.
+use crate::error::HashValueError;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashAlgorithm {
     /// SHA-256.
@@ -58,7 +60,7 @@ impl HashValue {
     /// let value = HashValue::new(HashAlgorithm::Sha256, digest);
     /// assert!(value.is_ok());
     /// ```
-    pub fn new(algorithm: HashAlgorithm, bytes: Vec<u8>) -> Result<Self, String> {
+    pub fn new(algorithm: HashAlgorithm, bytes: Vec<u8>) -> Result<Self, HashValueError> {
         // Validates the digest length for the selected algorithm.
         let expected_length = match algorithm {
             HashAlgorithm::Sha256 => 32,
@@ -69,11 +71,11 @@ impl HashValue {
 
         // Failure
         if bytes.len() != expected_length {
-            return Err(format!(
-                "Invalid hash length: expected {}, got {}",
-                expected_length,
-                bytes.len()
-            ));
+            return Err(HashValueError::InvalidLength {
+                algorithm,
+                expected: expected_length,
+                actual: bytes.len(),
+            });
         }
 
         Ok(Self { algorithm, bytes })
@@ -208,19 +210,49 @@ impl SignedTreeHead {
     }
 }
 
-/// Groups certificate data, a Merkle inclusion proof, and a signed tree head.
+/// Represents a Merkle tree inclusion proof.
 ///
-/// This type does not verify the inclusion proof, verify the tree-head
-/// signature, or establish trust in the supplied tree head.
+/// An inclusion proof contains the sibling hashes required to reconstruct
+/// the Merkle root for a particular leaf. The proof data alone does not
+/// establish that the leaf is included in a trusted tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InclusionProof {
+    /// Sibling hashes used to reconstruct the Merkle root.
+    siblings: Vec<HashValue>,
+}
+
+impl InclusionProof {
+    /// Creates an inclusion proof from its sibling hashes.
+    ///
+    /// This constructor stores the supplied hashes without verifying
+    /// the proof.
+    pub fn new(siblings: Vec<HashValue>) -> Self {
+        Self { siblings }
+    }
+
+    /// Returns the sibling hashes as a borrowed slice.
+    pub fn siblings(&self) -> &[HashValue] {
+        &self.siblings
+    }
+}
+
+/// Represents a certificate together with its inclusion evidence.
+///
+/// This type groups the certificate body, its position in the Merkle tree,
+/// the inclusion proof, and the associated signed tree head. It does not
+/// verify the proof or the tree-head signature.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MtcCertificate {
     /// Certificate data represented by the Merkle tree.
     body: Vec<u8>,
 
-    /// Sibling hashes used to reconstruct a Merkle root during inclusion verification.
-    proof: Vec<HashValue>,
+    /// Zero-based index of the certificate in the Merkle tree.
+    leaf_index: u64,
 
-    /// Tree head and its associated signature; neither is verified by this type.
+    /// Inclusion proof for the certificate.
+    proof: InclusionProof,
+
+    /// Tree head and its associated signature.
     signed_tree_head: SignedTreeHead,
 }
 
@@ -229,9 +261,15 @@ impl MtcCertificate {
     ///
     /// The supplied data is stored without verifying the inclusion proof or
     /// the signature associated with the tree head.
-    pub fn new(body: Vec<u8>, proof: Vec<HashValue>, signed_tree_head: SignedTreeHead) -> Self {
+    pub fn new(
+        body: Vec<u8>,
+        leaf_index: u64,
+        proof: InclusionProof,
+        signed_tree_head: SignedTreeHead,
+    ) -> Self {
         Self {
             body,
+            leaf_index,
             proof,
             signed_tree_head,
         }
@@ -242,8 +280,13 @@ impl MtcCertificate {
         &self.body
     }
 
+    /// Returns the zero-based index of the certificate in the Merkle tree.
+    pub fn leaf_index(&self) -> u64 {
+        self.leaf_index
+    }
+
     /// Returns the inclusion proof as a borrowed slice of sibling hashes.
-    pub fn proof(&self) -> &[HashValue] {
+    pub fn proof(&self) -> &InclusionProof {
         &self.proof
     }
 
@@ -269,11 +312,18 @@ mod tests {
 
     #[test]
     fn sha256_hash_with_wrong_length_is_rejected() {
-        let bytes = vec![0u8; 10];
+        let bytes = vec![0_u8; 10];
 
         let result = HashValue::new(HashAlgorithm::Sha256, bytes);
 
-        assert!(result.is_err());
+        assert_eq!(
+            result,
+            Err(HashValueError::InvalidLength {
+                algorithm: HashAlgorithm::Sha256,
+                expected: 32,
+                actual: 10,
+            })
+        );
     }
 
     #[test]
@@ -356,7 +406,7 @@ mod tests {
 
         let proof_hash = HashValue::new(HashAlgorithm::Sha256, vec![0u8; 32]).unwrap();
 
-        let proof = vec![proof_hash.clone()];
+        let proof = InclusionProof::new(vec![proof_hash.clone()]);
 
         let hash = HashValue::new(HashAlgorithm::Sha256, vec![0u8; 32]).unwrap();
 
@@ -370,13 +420,30 @@ mod tests {
 
         let signed_tree_head = SignedTreeHead::new(tree_head, signature);
 
-        let certificate =
-            MtcCertificate::new(body.clone(), proof.clone(), signed_tree_head.clone());
+        let leaf_index = 3;
+
+        let certificate = MtcCertificate::new(
+            body.clone(),
+            leaf_index,
+            proof.clone(),
+            signed_tree_head.clone(),
+        );
 
         assert_eq!(certificate.body(), body.as_slice());
 
-        assert_eq!(certificate.proof(), proof.as_slice());
+        assert_eq!(certificate.proof(), &proof);
 
         assert_eq!(certificate.signed_tree_head(), &signed_tree_head);
+    }
+
+    #[test]
+    fn inclusion_proof_exposes_sibling_hashes() {
+        let hash1 = HashValue::new(HashAlgorithm::Sha256, vec![1_u8; 32]).unwrap();
+        let hash2 = HashValue::new(HashAlgorithm::Sha256, vec![2_u8; 32]).unwrap();
+
+        let siblings = vec![hash1.clone(), hash2.clone()];
+        let proof = InclusionProof::new(siblings);
+
+        assert_eq!(proof.siblings(), &[hash1, hash2]);
     }
 }

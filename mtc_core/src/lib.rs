@@ -16,4 +16,5 @@
 //! Serialization support, protocol-specific metadata, and additional
 //! algorithm identifiers may be introduced as the architecture develops.
 
+pub mod error;
 pub mod types;

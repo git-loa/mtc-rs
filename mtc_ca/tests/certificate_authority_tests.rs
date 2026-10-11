@@ -115,11 +115,11 @@ fn get_inclusion_proof_returns_proof_for_valid_index() {
     let proof1 = ca.get_inclusion_proof(index1).unwrap();
     let proof2 = ca.get_inclusion_proof(index2).unwrap();
 
-    assert!(!proof1.is_empty());
-    assert!(!proof2.is_empty());
+    assert!(!proof1.siblings().is_empty());
+    assert!(!proof2.siblings().is_empty());
     assert!(proof1 != proof2);
-    assert_eq!(proof1.len(), 1);
-    assert_eq!(proof2.len(), 1);
+    assert_eq!(proof1.siblings().len(), 1);
+    assert_eq!(proof2.siblings().len(), 1);
 }
 
 #[test]
@@ -144,10 +144,10 @@ fn two_leaf_inclusion_proofs_contain_the_other_leaf_hash() {
     let leaf1_hash = Blake3Hash.hash_leaf(cert1).unwrap();
     let leaf2_hash = Blake3Hash.hash_leaf(cert2).unwrap();
 
-    assert!(proof1.contains(&leaf2_hash));
-    assert!(proof2.contains(&leaf1_hash));
-    assert!(proof1[0] == leaf2_hash);
-    assert!(proof2[0] == leaf1_hash);
+    assert!(proof1.siblings().contains(&leaf2_hash));
+    assert!(proof2.siblings().contains(&leaf1_hash));
+    assert!(proof1.siblings()[0] == leaf2_hash);
+    assert!(proof2.siblings()[0] == leaf1_hash);
 }
 
 #[test]

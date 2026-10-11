@@ -8,7 +8,7 @@
 
 use crate::error::TreeError;
 use crate::tree::{MerkleTree, largest_power_of_two_less_than};
-use mtc_core::types::HashValue;
+use mtc_core::types::{HashValue, InclusionProof};
 use mtc_crypto::hash::HashFn;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -33,26 +33,28 @@ enum Direction {
 pub fn generate_inclusion_proof<H: HashFn>(
     tree: &MerkleTree<H>,
     leaf_index: usize,
-) -> Result<Vec<HashValue>, TreeError> {
+) -> Result<InclusionProof, TreeError> {
     if leaf_index >= tree.len() {
         return Err(TreeError::InvalidLeafIndex);
     }
 
-    // Single-leaf case
+    // A single-leaf tree has no sibling hashes.
     if tree.len() == 1 {
-        return Ok(Vec::new());
+        return Ok(InclusionProof::new(Vec::new()));
     }
 
-    // Two-leaf base case
+    // Preserve the existing two-leaf handling.
     if tree.len() == 2 {
-        if leaf_index == 0 {
-            return Ok(vec![tree.leaves()[1].clone()]);
-        }
-
-        return Ok(vec![tree.leaves()[0].clone()]);
+        let sibling = if leaf_index == 0 {
+            tree.leaves()[1].clone()
+        } else {
+            tree.leaves()[0].clone()
+        };
+        return Ok(InclusionProof::new(vec![sibling]));
     }
 
-    generate_proof(tree, tree.leaves(), leaf_index)
+    let siblings = generate_proof(tree, tree.leaves(), leaf_index)?;
+    Ok(InclusionProof::new(siblings))
 }
 
 /// Recursively generates an inclusion proof within a subtree.
@@ -153,18 +155,19 @@ pub fn verify_inclusion_proof<H: HashFn>(
     leaf_data: &[u8],
     leaf_index: usize,
     tree_size: usize,
-    proof: &[HashValue],
+    proof: &InclusionProof,
     expected_root: &HashValue,
 ) -> Result<bool, TreeError> {
     let mut current = hasher.hash_leaf(leaf_data)?;
 
     let path = determine_proof_path(leaf_index, tree_size)?;
+    let siblings = proof.siblings();
 
-    if proof.len() != path.len() {
+    if siblings.len() != path.len() {
         return Err(TreeError::InvalidProofLength);
     }
 
-    for (direction, sibling) in path.iter().zip(proof.iter()) {
+    for (direction, sibling) in path.iter().zip(siblings.iter()) {
         current = match direction {
             Direction::Left => hasher.hash_two_children(&current, sibling)?,
             Direction::Right => hasher.hash_two_children(sibling, &current)?,
@@ -188,7 +191,7 @@ mod tests {
         tree.append(b"hello").unwrap();
 
         let proof = generate_inclusion_proof(&tree, 0).unwrap();
-        assert!(proof.is_empty());
+        assert!(proof.siblings().is_empty());
     }
 
     #[test]
@@ -199,8 +202,8 @@ mod tests {
 
         let proof = generate_inclusion_proof(&tree, 0).unwrap();
 
-        assert_eq!(proof.len(), 1);
-        assert_eq!(proof[0], tree.leaves()[1]);
+        assert_eq!(proof.siblings().len(), 1);
+        assert_eq!(proof.siblings()[0], tree.leaves()[1]);
     }
 
     #[test]
@@ -211,8 +214,8 @@ mod tests {
 
         let proof = generate_inclusion_proof(&tree, 1).unwrap();
 
-        assert_eq!(proof.len(), 1);
-        assert_eq!(proof[0], tree.leaves()[0]);
+        assert_eq!(proof.siblings().len(), 1);
+        assert_eq!(proof.siblings()[0], tree.leaves()[0]);
     }
 
     #[test]
@@ -227,7 +230,7 @@ mod tests {
         tree.append(b"d5").unwrap();
 
         let proof = generate_inclusion_proof(&tree, 2).unwrap();
-        assert_eq!(proof.len(), 3);
+        assert_eq!(proof.siblings().len(), 3);
 
         let hasher = Blake3Hash;
 
@@ -241,9 +244,9 @@ mod tests {
         let d5_hash = hasher.hash_leaf(b"d5").unwrap();
         let d4_d5_root = hasher.hash_two_children(&d4_hash, &d5_hash).unwrap();
 
-        assert_eq!(proof[0], d3_hash);
-        assert_eq!(proof[1], d0_d1_root);
-        assert_eq!(proof[2], d4_d5_root);
+        assert_eq!(proof.siblings()[0], d3_hash);
+        assert_eq!(proof.siblings()[1], d0_d1_root);
+        assert_eq!(proof.siblings()[2], d4_d5_root);
     }
 
     #[test]
@@ -259,7 +262,7 @@ mod tests {
 
         let proof = generate_inclusion_proof(&tree, 5).unwrap();
 
-        assert_eq!(proof.len(), 2);
+        assert_eq!(proof.siblings().len(), 2);
 
         let hasher = Blake3Hash;
 
@@ -276,8 +279,8 @@ mod tests {
 
         let d0_d1_d2_d3_root = hasher.hash_two_children(&d0_d1_root, &d2_d3_root).unwrap();
 
-        assert_eq!(proof[0], d4_hash);
-        assert_eq!(proof[1], d0_d1_d2_d3_root);
+        assert_eq!(proof.siblings()[0], d4_hash);
+        assert_eq!(proof.siblings()[1], d0_d1_d2_d3_root);
     }
 
     #[test]
@@ -306,7 +309,7 @@ mod tests {
 
         let proof = generate_inclusion_proof(&tree, 0).unwrap();
 
-        assert_eq!(proof.len(), 3);
+        assert_eq!(proof.siblings().len(), 3);
 
         let hasher = Blake3Hash;
 
@@ -320,9 +323,9 @@ mod tests {
         let d5_hash = hasher.hash_leaf(b"d5").unwrap();
         let d4_d5_root = hasher.hash_two_children(&d4_hash, &d5_hash).unwrap();
 
-        assert_eq!(proof[0], d1_hash);
-        assert_eq!(proof[1], d2_d3_root);
-        assert_eq!(proof[2], d4_d5_root);
+        assert_eq!(proof.siblings()[0], d1_hash);
+        assert_eq!(proof.siblings()[1], d2_d3_root);
+        assert_eq!(proof.siblings()[2], d4_d5_root);
     }
 
     #[test]
@@ -352,7 +355,7 @@ mod tests {
         let leaf_data = b"d0";
         let expected_root = hasher.hash_leaf(leaf_data).unwrap();
 
-        let proof = Vec::new();
+        let proof = InclusionProof::new(Vec::new());
 
         let result =
             verify_inclusion_proof(&hasher, leaf_data, 0, 1, &proof, &expected_root).unwrap();
@@ -393,17 +396,17 @@ mod tests {
         let expected_root = tree.root().unwrap();
 
         let d3 = hasher.hash_leaf(b"d3").unwrap();
-        assert_eq!(proof[0], d3);
+        assert_eq!(proof.siblings()[0], d3);
 
         let d0 = hasher.hash_leaf(b"d0").unwrap();
         let d1 = hasher.hash_leaf(b"d1").unwrap();
         let d01 = hasher.hash_two_children(&d0, &d1).unwrap();
-        assert_eq!(proof[1], d01);
+        assert_eq!(proof.siblings()[1], d01);
 
         let d4 = hasher.hash_leaf(b"d4").unwrap();
         let d5 = hasher.hash_leaf(b"d5").unwrap();
         let d45 = hasher.hash_two_children(&d4, &d5).unwrap();
-        assert_eq!(proof[2], d45);
+        assert_eq!(proof.siblings()[2], d45);
 
         let result = verify_inclusion_proof(&hasher, b"d2", 2, 6, &proof, &expected_root).unwrap();
 

@@ -1,7 +1,7 @@
 //! Certificate storage and Merkle-tree integration for the MTC system.
 
 use crate::error::CertificateAuthorityError;
-use mtc_core::types::HashValue;
+use mtc_core::types::{HashValue, InclusionProof};
 use mtc_crypto::hash::HashFn;
 use mtc_tree::proof::generate_inclusion_proof;
 use mtc_tree::tree::MerkleTree;
@@ -150,7 +150,7 @@ impl<H: HashFn> CertificateAuthority<H> {
     ///
     /// # Returns
     ///
-    /// The sibling hashes forming the inclusion proof.
+    ///  An [`InclusionProof`] containing the sibling hashes for the proof.
     ///
     /// # Errors
     ///
@@ -165,7 +165,7 @@ impl<H: HashFn> CertificateAuthority<H> {
     pub fn get_inclusion_proof(
         &self,
         index: usize,
-    ) -> Result<Vec<HashValue>, CertificateAuthorityError> {
+    ) -> Result<InclusionProof, CertificateAuthorityError> {
         Ok(generate_inclusion_proof(&self.tree, index)?)
     }
 }
