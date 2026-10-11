@@ -62,6 +62,9 @@ impl<H: HashFn> MerkleTree<H> {
     /// compute the leaf hash.
     pub fn append(&mut self, data: &[u8]) -> Result<(), TreeError> {
         let leaf_hash = self.hasher.hash_leaf(data)?;
+        self.leaves
+            .try_reserve(1)
+            .map_err(|_| TreeError::MemoryAllocationFailed)?;
         self.leaves.push(leaf_hash);
 
         Ok(())

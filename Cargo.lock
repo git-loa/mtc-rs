@@ -71,6 +71,7 @@ dependencies = [
  "mtc_core",
  "mtc_crypto",
  "mtc_tree",
+ "thiserror",
 ]
 
 [[package]]
@@ -84,6 +85,9 @@ version = "0.1.0"
 [[package]]
 name = "mtc_core"
 version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "mtc_crypto"

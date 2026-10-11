@@ -1,36 +1,34 @@
-//! # mtc_ca
+//! Certificate-authority functionality for the Merkle Tree Certificate (MTC) system.
 //!
-//! Certificate-authority functionality for the MTC system.
+//! This crate coordinates certificate storage and integration with the
+//! MTC transparency tree. It connects shared data structures, cryptographic
+//! hashing, and Merkle-tree operations without reimplementing their
+//! underlying functionality.
 //!
-//! ## Purpose
+//! # Architecture
 //!
-//! Coordinates certificate records and their inclusion in the MTC
-//! transparency tree.
+//! The crate depends on the following components:
 //!
-//! ## Responsibilities
+//! - `mtc_core` provides shared data structures, including `HashValue`.
+//! - `mtc_crypto` provides hashing abstractions and hash implementations.
+//! - `mtc_tree` provides Merkle-tree operations and inclusion proofs.
 //!
-//! - Manage certificate records.
-//! - Coordinate insertion of records into the Merkle tree.
-//! - Generate inclusion proofs for certificate records.
-//! - Coordinate tree-head creation as the implementation develops.
+//! The [`certificate_authority`] module manages certificate records and
+//! coordinates their inclusion in the Merkle tree. The [`error`] module
+//! defines errors returned by certificate-authority operations.
 //!
-//! ## Dependencies
+//! # Current capabilities
 //!
-//! - `mtc_core` provides shared MTC data structures.
-//! - `mtc_crypto` provides cryptographic abstractions and implementations.
-//! - `mtc_tree` provides Merkle tree operations and inclusion proofs.
+//! The crate supports:
 //!
-//! ## Boundaries
+//! - Storing certificate data and retrieving certificates by index.
+//! - Maintaining a Merkle tree containing the stored certificates.
+//! - Retrieving the current Merkle-tree root hash.
+//! - Generating inclusion proofs for stored certificates.
 //!
-//! This crate coordinates certificate-related operations. Merkle tree
-//! construction belongs in `mtc_tree`, while hashing operations belong
-//! in `mtc_crypto`.
-//!
-//! Digital-signature generation and verification are not yet implemented.
-//!
-//! ## Status
-//!
-//! The crate's dependencies are configured. Certificate management and
-//! integration with the Merkle tree remain to be implemented.
+//! Inclusion-proof verification is provided by `mtc_tree`. Verification of
+//! digital signatures and other certificate-management operations are
+//! outside the scope of the current implementation.
 
 pub mod certificate_authority;
+pub mod error;

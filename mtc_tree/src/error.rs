@@ -18,6 +18,10 @@ pub enum TreeError {
     #[error("Tree size must be greater than zero.")]
     InvalidTreeSize,
 
+    ///Memory allocation failed during tree operation.
+    #[error("Failed to allocate memory for tree Merkle operation.")]
+    MemoryAllocationFailed,
+
     /// An underlying cryptographic operation failed.
     #[error("Cryptographic error: {0:?}")]
     Crypto(#[from] CryptoError),

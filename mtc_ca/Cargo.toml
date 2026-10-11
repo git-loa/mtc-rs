@@ -7,3 +7,4 @@ edition = "2024"
 mtc_core = {path = "../mtc_core"}
 mtc_crypto = { path = "../mtc_crypto" }
 mtc_tree = { path = "../mtc_tree" }
+thiserror = "2.0"
