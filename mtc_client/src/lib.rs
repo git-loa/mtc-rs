@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Client functionality for verifying Merkle Tree Certificate inclusion.
+//!
+//! This crate provides certificate inclusion verification and associated
+//! error types. It does not currently verify signed tree head signatures
+//! or establish trust in a tree's root.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Error types returned by the MTC client.
+pub mod error;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+/// Certificate inclusion verification functionality.
+pub mod verification;

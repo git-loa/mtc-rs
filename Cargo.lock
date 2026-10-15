@@ -81,6 +81,12 @@ version = "0.1.0"
 [[package]]
 name = "mtc_client"
 version = "0.1.0"
+dependencies = [
+ "mtc_core",
+ "mtc_crypto",
+ "mtc_tree",
+ "thiserror",
+]
 
 [[package]]
 name = "mtc_core"

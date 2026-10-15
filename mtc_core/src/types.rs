@@ -109,6 +109,18 @@ pub struct TreeHead {
 }
 
 impl TreeHead {
+    /// Creates a tree head from a root hash, tree size, and timestamp.
+    ///
+    /// This constructor stores the supplied values without verifying
+    /// that the root corresponds to a particular tree or that the
+    /// timestamp is trustworthy.
+    pub fn new(root: HashValue, size: u64, timestamp: u64) -> Self {
+        Self {
+            root,
+            size,
+            timestamp,
+        }
+    }
     /// Returns a reference to the Merkle tree root hash.
     pub fn root(&self) -> &HashValue {
         &self.root
